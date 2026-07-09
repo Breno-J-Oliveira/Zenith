@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { ShellLayout } from '../../components/ShellLayout';
 import { QuickInput } from '../../components/QuickInput';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
@@ -15,6 +16,19 @@ const weeklyData = [
 ];
 
 export default function DashboardPage() {
+  const [activeGoals, setActiveGoals] = useState(0);
+  const [totalTasks, setTotalTasks] = useState(0);
+
+  useEffect(() => {
+    fetch('http://localhost:3002/goals?status=ACTIVE')
+      .then(r => r.json())
+      .then(data => setActiveGoals(Array.isArray(data) ? data.length : 0))
+      .catch(() => setActiveGoals(0));
+    fetch('http://localhost:3002/tasks')
+      .then(r => r.json())
+      .then(data => setTotalTasks(Array.isArray(data) ? data.length : 0))
+      .catch(() => setTotalTasks(0));
+  }, []);
   return (
     <ShellLayout>
       <div className="p-8 max-w-5xl">
@@ -41,7 +55,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="font-mono text-xs text-dim mb-1">METAS ATIVAS</p>
-              <p className="font-orbitron text-3xl font-bold text-primary">7</p>
+              <p className="font-orbitron text-3xl font-bold text-primary">{activeGoals}</p>
             </div>
             <div>
               <p className="font-mono text-xs text-dim mb-1">PROGRESSO SEMANAL</p>
@@ -84,8 +98,8 @@ export default function DashboardPage() {
             <p className="font-orbitron text-2xl font-bold">5 dias</p>
           </div>
           <div className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-lg p-6">
-            <p className="font-mono text-xs text-dim mb-2">PRÓXIMA META</p>
-            <p className="font-orbitron text-2xl font-bold">Ler 30 páginas</p>
+            <p className="font-mono text-xs text-dim mb-2">TAREFAS</p>
+            <p className="font-orbitron text-2xl font-bold">{totalTasks}</p>
           </div>
         </div>
       </div>

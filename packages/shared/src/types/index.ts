@@ -73,3 +73,82 @@ export interface AILogEntry {
   input: string;
   result: ParsedAIResult;
 }
+
+export type GoalStatus = 'ACTIVE' | 'COMPLETED' | 'PAUSED' | 'CANCELLED';
+
+export type GoalCategory = 'pessoal' | 'trabalho' | 'financeiro' | 'saude' | 'estudo';
+
+export type TaskStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+
+export interface Milestone {
+  id: string;
+  goalId: string;
+  title: string;
+  deadline?: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface Task {
+  id: string;
+  goalId?: string;
+  milestoneId?: string;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  date?: string;
+  completed: boolean;
+  createdAt: string;
+}
+
+export interface Goal {
+  id: string;
+  title: string;
+  description?: string;
+  category: GoalCategory;
+  priority: 'baixa' | 'media' | 'alta';
+  status: GoalStatus;
+  deadline?: string;
+  milestones: Milestone[];
+  tasks: Task[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateGoalDTO {
+  title: string;
+  description?: string;
+  category?: GoalCategory;
+  priority?: 'baixa' | 'media' | 'alta';
+  deadline?: string;
+}
+
+export interface UpdateGoalDTO {
+  title?: string;
+  description?: string;
+  category?: GoalCategory;
+  priority?: 'baixa' | 'media' | 'alta';
+  status?: GoalStatus;
+  deadline?: string;
+}
+
+export interface CreateMilestoneDTO {
+  title: string;
+  deadline?: string;
+}
+
+export interface CreateTaskDTO {
+  title: string;
+  description?: string;
+  goalId?: string;
+  milestoneId?: string;
+  date?: string;
+}
+
+export interface UpdateTaskDTO {
+  title?: string;
+  description?: string;
+  status?: TaskStatus;
+  completed?: boolean;
+  date?: string;
+}

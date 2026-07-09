@@ -7,6 +7,7 @@ Aplicação fullstack de produtividade pessoal inspirada no Notion, com a IA com
 **Fase 0 — Fundação** ✅ Concluída
 **Fase 1 — UI Shell + Telas Mock** ✅ Concluída
 **Fase 2 — Quick Input + IA (núcleo)** ✅ Concluída
+**Fase 3 — Metas, Marcos & Tarefas** ✅ Concluída
 
 ## Stack
 
@@ -30,7 +31,7 @@ zenith/
 │   │   │   ├── (auth)/register/  # Tela de cadastro (mock)
 │   │   │   ├── dashboard/        # Dashboard com QuickInput + gráficos
 │   │   │   ├── settings/         # Configurações + seletor de tema
-│   │   │   ├── metas/            # Placeholder
+│   │   │   ├── metas/            # CRUD de metas + marcos + tarefas
 │   │   │   └── relatorio/        # Placeholder
 │   │   ├── components/           # Header, Sidebar, Footer, ShellLayout, QuickInput
 │   │   └── lib/utils.ts          # cn() helper
@@ -40,14 +41,23 @@ zenith/
 │           ├── app.module.ts
 │           ├── app.controller.ts # GET / + GET /health
 │           ├── app.service.ts
-│           └── ai/               # Módulo AI
-│               ├── ai.module.ts
-│               ├── ai.controller.ts  # POST /ai/parse + GET /ai/log
-│               └── ai.service.ts     # MockAIProvider + log em memória
+│           ├── ai/               # Módulo AI (Gemini + Mock fallback)
+│           │   ├── ai.module.ts
+│           │   ├── ai.controller.ts  # POST /ai/parse + GET /ai/log
+│           │   ├── ai.service.ts     # GeminiProvider + fallback MockAIProvider
+│           │   └── gemini.provider.ts # Google Gemini SDK (gemini-2.5-flash)
+│           ├── goals/            # Módulo Metas + Marcos
+│           │   ├── goals.module.ts
+│           │   ├── goals.controller.ts  # CRUD /goals + /goals/:id/milestones
+│           │   └── goals.service.ts     # Lógica + progress + milestones
+│           └── tasks/            # Módulo Tarefas
+│               ├── tasks.module.ts
+│               ├── tasks.controller.ts  # CRUD /tasks + /tasks/:id/toggle
+│               └── tasks.service.ts
 ├── packages/
 │   └── shared/
 │       └── src/
-│           ├── types/index.ts        # User, Session, AuthProvider, AIIntent, ParsedAIResult, AILogEntry
+│           ├── types/index.ts        # User, Session, AIIntent, ParsedAIResult, AILogEntry, Goal, Milestone, Task, DTOs
 │           ├── auth/index.ts         # MockAuthProvider
 │           ├── ai/index.ts           # MockAIProvider (parsing determinístico)
 │           ├── theme/tokens.css      # CSS variables (paletas red/violet/green)
@@ -81,7 +91,19 @@ Usa `MockAuthProvider` — sempre sucesso, sem chamadas de rede. Sessão persist
 
 ## IA (Quick Input)
 
-Usa `MockAIProvider` com parsing determinístico por keywords/regex. Identifica intents: `LOG_EXPENSE`, `CREATE_EVENT`, `CREATE_GOAL`, `CREATE_TASK`, `UNKNOWN`. Backend expõe `POST /ai/parse` e `GET /ai/log`. Integração com OpenAI API (GPT-4o-mini) será feita quando houver API key disponível.
+Usa `Google Gemini` (gemini-2.5-flash) como IA real, com `MockAIProvider` como fallback automático. Identifica intents: `LOG_EXPENSE`, `CREATE_EVENT`, `CREATE_GOAL`, `CREATE_TASK`, `UNKNOWN`. Backend expõe `POST /ai/parse` e `GET /ai/log`.
+
+## Metas, Marcos & Tarefas
+
+Backend expõe CRUD completo:
+- `POST/GET/PUT/DELETE /goals` — metas com categoria, prioridade, status e deadline
+- `POST/GET /goals/:id/milestones` — marcos vinculados a metas
+- `PATCH /goals/:id/milestones/:mid/toggle` — alternar conclusão de marco
+- `GET /goals/:id/progress` — progresso percentual (marcos + tarefas)
+- `POST/GET/PUT/DELETE /tasks` — tarefas independentes ou vinculadas a metas
+- `PATCH /tasks/:id/toggle` — alternar conclusão de tarefa
+
+Página `/metas` com cards expansíveis, barra de progresso, filtros por status e categoria, criação de metas/marcos/tarefas inline.
 
 ## Como rodar
 
@@ -100,8 +122,8 @@ cd apps/backend && npm run dev
 
 - [x] **Fase 0** — Fundação: monorepo, tema, MockAuthProvider, Logo, backend skeleton
 - [x] **Fase 1** — UI Shell + telas mock: login, dashboard, settings, navegação
-- [x] **Fase 2** — Quick Input + IA: MockAIProvider, POST /ai/parse, QuickInput no dashboard
-- [ ] **Fase 3** — Metas, Marcos & Tarefas
+- [x] **Fase 2** — Quick Input + IA: MockAIProvider, POST /ai/parse, QuickInput no dashboard, Gemini real com fallback
+- [x] **Fase 3** — Metas, Marcos & Tarefas: CRUD completo backend + frontend, progresso visual, filtros
 - [ ] **Fase 4** — Rotinas & Reorganização Adaptativa
 - [ ] **Fase 5** — Calendário & Planejamento
 - [ ] **Fase 6** — Sistema de Blocos (Notion-like)
