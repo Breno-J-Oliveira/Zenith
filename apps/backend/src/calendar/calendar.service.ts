@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { GoalsService } from '../goals/goals.service';
 import { RoutinesService } from '../routines/routines.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
+import { ConflictResolver } from '../shared/conflict-resolver.service';
 
 export interface CalendarEvent {
   id: string;
@@ -32,6 +33,7 @@ export class CalendarService {
     private readonly goalsService: GoalsService,
     private readonly routinesService: RoutinesService,
     private readonly schedulerService: SchedulerService,
+    private readonly conflictResolver: ConflictResolver,
   ) {}
 
   getEvents(from: string, to: string): CalendarEvent[] {
@@ -61,12 +63,12 @@ export class CalendarService {
       if (task.date >= from && task.date <= to) {
         const time = (task as any).time || '08:00';
         const duration = (task as any).duration || 60;
-        const endMinutes = this.toMinutes(time) + duration;
+        const endMinutes = this.conflictResolver.toMinutes(time) + duration;
         events.push({
           id: `cal-rtask-${task.id}`,
           title: task.title,
           start: `${task.date}T${time}:00`,
-          end: `${task.date}T${this.fromMinutes(endMinutes)}:00`,
+          end: `${task.date}T${this.conflictResolver.fromMinutes(endMinutes)}:00`,
           type: 'routine',
           sourceId: task.id,
           done: task.completed,
@@ -112,18 +114,24 @@ export class CalendarService {
       const moved: RescheduleResult['moved'] = [];
 
       const taskDuration = (task as any)?.duration || 60;
-      const taskStart = this.toMinutes(newTime);
+      const taskStart = this.conflictResolver.toMinutes(newTime);
       const taskEnd = taskStart + taskDuration;
 
       for (const other of dayTasks) {
         if (other.id === sourceId) continue;
         const otherTime = (other as any).time || '00:00';
         const otherDuration = (other as any).duration || 60;
-        const otherStart = this.toMinutes(otherTime);
+        const otherStart = this.conflictResolver.toMinutes(otherTime);
         const otherEnd = otherStart + otherDuration;
 
-        if (taskStart < otherEnd && taskEnd > otherStart) {
-          const newSlot = this.findFreeSlotForDate(newDate, otherDuration, other.id, sourceId);
+        if (this.conflictResolver.hasConflict(taskStart, taskEnd, otherStart, otherEnd)) {
+          const busy = this.buildBusyListForDate(newDate, other.id, sourceId);
+          const newSlot = this.conflictResolver.findFreeSlot({
+            conflictStart: taskStart,
+            conflictEnd: taskEnd,
+            duration: otherDuration,
+            busy,
+          });
           if (newSlot) {
             (other as any).time = newSlot.time;
             moved.push({
@@ -144,7 +152,7 @@ export class CalendarService {
         id: `cal-rtask-${sourceId}`,
         title: task?.title || 'Task',
         start: dto.newStart,
-        end: dto.newEnd || `${newDate}T${this.fromMinutes(taskStart + taskDuration)}:00`,
+        end: dto.newEnd || `${newDate}T${this.conflictResolver.fromMinutes(taskStart + taskDuration)}:00`,
         type: 'routine',
         sourceId,
         done: task?.completed,
@@ -168,45 +176,23 @@ export class CalendarService {
     return { event: null as any, moved: [], message: 'Tipo de evento desconhecido.' };
   }
 
-  private findFreeSlotForDate(
-    date: string,
-    duration: number,
-    excludeTaskId: string,
-    alsoExcludeTaskId: string,
-  ): { time: string } | null {
+  private buildBusyListForDate(date: string, excludeTaskId: string, alsoExcludeTaskId: string) {
     const dayTasks = this.routinesService.getTasksForDate(date);
-    const busy: Array<{ start: number; end: number }> = dayTasks
+    const busy = dayTasks
       .filter(t => t.id !== excludeTaskId && t.id !== alsoExcludeTaskId)
       .map(t => {
-        const s = this.toMinutes((t as any).time || '00:00');
+        const s = this.conflictResolver.toMinutes((t as any).time || '00:00');
         return { start: s, end: s + ((t as any).duration || 60) };
       });
 
     const appointments = this.schedulerService.findAll().filter(a => a.date === date);
     for (const appt of appointments) {
-      busy.push({ start: this.toMinutes(appt.startTime), end: this.toMinutes(appt.endTime) });
+      busy.push({
+        start: this.conflictResolver.toMinutes(appt.startTime),
+        end: this.conflictResolver.toMinutes(appt.endTime),
+      });
     }
 
-    // Try slots after the moved task's position, then before
-    for (let start = 0; start <= 23 * 60; start += 30) {
-      const end = start + duration;
-      if (end > 23 * 60 + 59) break;
-      if (!busy.some(b => start < b.end && end > b.start)) {
-        return { time: this.fromMinutes(start) };
-      }
-    }
-
-    return null;
-  }
-
-  private toMinutes(time: string): number {
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + (m || 0);
-  }
-
-  private fromMinutes(mins: number): string {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    return busy;
   }
 }

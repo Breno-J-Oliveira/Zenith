@@ -86,14 +86,15 @@ Links adicionados: `Hoje` → `/hoje`, `Calendário` → `/calendario` (entre Da
 
 ```
 1. Rotina "Estudar React" criada — diária, 10:00, 60min
-2. Tasks geradas para 3 dias
-3. Rotina "Academia" criada — diária, 11:00, 60min
-4. Tasks geradas para hoje
-5. PATCH /calendar/reschedule: mover "Estudar React" para 11:00
+2. Rotina "Academia" criada — diária, 11:00, 60min
+3. Tasks geradas para hoje
+4. PATCH /calendar/reschedule: mover "Estudar React" para 11:00
    → Conflito com "Academia" (11:00-12:00)
-   → "Academia" movida para 00:00 (primeiro slot livre)
-   → message: "Reorganizei sua rotina do dia 09/07/2026. Academia movida para 00:00."
+   → "Academia" movida para 12:00 (depois do conflito: 11h + 60min = 12h)
+   → message: "Reorganizei sua rotina do dia 09/07/2026. Academia movida para 12:00."
 ```
+
+**Consistência verificada**: O SchedulerService (Fase 4) também usa o mesmo ConflictResolver. Ao criar um appointment "Dentista" 14h-15h que conflita com rotina "Leitura" 14h-15h, a tarefa é movida para 15:00 (depois do conflito) — mesma heurística adjacente, não 00:00.
 
 ### Teste 2: Briefing com Gemini
 
@@ -129,7 +130,8 @@ Source: `"template"`. Não quebra — apenas gera texto simples.
 
 ## Arquivos criados/modificados
 
-### Criados (7 arquivos)
+### Criados (8 arquivos)
+- `apps/backend/src/shared/conflict-resolver.service.ts` — heurística única de resolução de conflito (depois→antes)
 - `apps/backend/src/calendar/calendar.module.ts`
 - `apps/backend/src/calendar/calendar.service.ts` — agregador + reschedule com reorganização
 - `apps/backend/src/calendar/calendar.controller.ts` — GET /calendar + PATCH /calendar/reschedule
@@ -138,8 +140,11 @@ Source: `"template"`. Não quebra — apenas gera texto simples.
 - `apps/web/app/calendario/page.tsx` — página de calendário
 - `apps/web/app/hoje/page.tsx` — página de visão diária + briefing
 
-### Modificados (5 arquivos)
+### Modificados (7 arquivos)
 - `apps/backend/src/app.module.ts` — +CalendarModule
+- `apps/backend/src/scheduler/scheduler.service.ts` — usa ConflictResolver (remove findFreeSlot/overlapsAny/toMinutes/fromMinutes privados)
+- `apps/backend/src/scheduler/scheduler.module.ts` — +ConflictResolver provider/export
+- `apps/backend/src/calendar/calendar.module.ts` — +ConflictResolver provider
 - `apps/backend/src/ai/ai.module.ts` — +GoalsModule (para briefing)
 - `apps/backend/src/ai/ai.service.ts` — +GoalsService injection + getBriefing()
 - `apps/backend/src/ai/ai.controller.ts` — +GET /ai/briefing
@@ -150,7 +155,7 @@ Source: `"template"`. Não quebra — apenas gera texto simples.
 ## Decisões
 
 - **Briefing no `/hoje` em vez do dashboard**: `/hoje` é a página de visão diária — o briefing como saudação inicial faz mais sentido ali. O dashboard mantém o QuickInput e gráficos.
-- **Reschedule reaproveita heurística mas não duplica**: O `CalendarService.findFreeSlotForDate` é uma versão generalizada do `SchedulerService.findFreeSlot` — procura o primeiro slot livre de 30 em 30 minutos a partir de 00:00. Não chama o SchedulerService diretamente porque o SchedulerService é orientado a appointments, não a tasks movidas via drag-and-drop. A lógica de detecção de conflito (sobreposição de intervalos) é a mesma.
+- **ConflictResolver compartilhado**: A lógica de "achar slot livre" foi extraída para `apps/backend/src/shared/conflict-resolver.service.ts` — um serviço NestJS injetável que ambos `SchedulerService` e `CalendarService` usam. A heurística é única: "depois do conflito → antes do conflito" (adjacente ao conflito, não varredura de 00:00). Isso garante consistência: não importa se o conflito vem de um appointment criado via IA ou de um drag-and-drop no calendário, a tarefa movida vai para o horário mais próximo, não para meia-noite.
 - **Appointments não são editáveis via drag-and-drop**: `editable: false` no FullCalendar para eventos do tipo appointment. Reagendar compromissos é uma operação mais complexa (deve disparar reorganização de rotinas) e fica para refino futuro.
 - **EventId com prefixo de tipo**: `cal-task-xxx`, `cal-rtask-xxx`, `cal-appt-xxx` — permite extrair o tipo e sourceId no backend sem campo extra no DTO.
 

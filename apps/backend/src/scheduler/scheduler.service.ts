@@ -1,35 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { RoutinesService } from '../routines/routines.service';
+import { ConflictResolver } from '../shared/conflict-resolver.service';
 import {
   Appointment, CreateAppointmentDTO,
   ReorganizationResult, MovedTask, Task,
 } from '../../../../packages/shared/src/types';
 
 /**
- * SchedulerService — Heurística de reorganização de rotina
+ * SchedulerService — Reorganização de rotina quando um compromisso é criado.
  *
- * Quando um compromisso pontual (Appointment) é criado para um dia,
- * o Scheduler verifica se existe conflito de horário com tarefas de rotina
- * já geradas para aquele dia.
- *
- * Regra de conflito: sobreposição de intervalos [startTime, endTime) da tarefa
- * vs [startTime, endTime) do compromisso.
- *
- * Heurística de realocação (simples e determinística):
- * 1. Tenta encaixar a tarefa DEPOIS do compromisso (startTime = appointment.endTime)
- * 2. Se não couber (passa das 23h), tenta ANTES (endTime = appointment.startTime)
- * 3. Se não couber em nenhum caso, mantém a tarefa onde está (não move)
- *
- * Exemplo (do ANOTAÇÕES.md):
- *   Rotina: Estudo React 14h-16h
- *   Compromisso: Reunião 14h-16h
- *   Conflito detectado → move Estudo React para 16h-18h (depois do compromisso)
+ * Usa ConflictResolver compartilhado para encontrar horário livre
+ * (heurística: depois do conflito → antes do conflito).
  */
 @Injectable()
 export class SchedulerService {
   private appointments: Appointment[] = [];
 
-  constructor(private readonly routinesService: RoutinesService) {}
+  constructor(
+    private readonly routinesService: RoutinesService,
+    private readonly conflictResolver: ConflictResolver,
+  ) {}
 
   createAppointment(dto: CreateAppointmentDTO): ReorganizationResult {
     const appointment: Appointment = {
@@ -53,21 +43,27 @@ export class SchedulerService {
     const dayTasks = this.routinesService.getTasksForDate(appointment.date);
     const moved: MovedTask[] = [];
 
+    const apptStart = this.conflictResolver.toMinutes(appointment.startTime);
+    const apptEnd = this.conflictResolver.toMinutes(appointment.endTime);
+
     for (const task of dayTasks) {
       const taskTime = (task as any).time as string;
       const taskDuration = (task as any).duration as number;
       if (!taskTime) continue;
 
-      const taskStart = this.toMinutes(taskTime);
+      const taskStart = this.conflictResolver.toMinutes(taskTime);
       const taskEnd = taskStart + (taskDuration || 60);
 
-      const apptStart = this.toMinutes(appointment.startTime);
-      const apptEnd = this.toMinutes(appointment.endTime);
+      if (!this.conflictResolver.hasConflict(taskStart, taskEnd, apptStart, apptEnd)) continue;
 
-      const hasConflict = taskStart < apptEnd && taskEnd > apptStart;
-      if (!hasConflict) continue;
+      const busy = this.buildBusyList(appointment.date, dayTasks, task.id, appointment.id);
 
-      const newSlot = this.findFreeSlot(appointment, dayTasks, taskDuration || 60, task.id);
+      const newSlot = this.conflictResolver.findFreeSlot({
+        conflictStart: apptStart,
+        conflictEnd: apptEnd,
+        duration: taskDuration || 60,
+        busy,
+      });
       if (!newSlot) continue;
 
       this.routinesService.updateGeneratedTask(task.id, {
@@ -90,67 +86,21 @@ export class SchedulerService {
     return { appointment, moved, message };
   }
 
-  /**
-   * Encontra um horário livre para mover a tarefa conflitante.
-   * Regra: tenta depois do compromisso primeiro, depois antes.
-   * "Livre" = não sobrepõe com outros compromissos nem tarefas já existentes no dia.
-   */
-  private findFreeSlot(
-    appointment: Appointment,
-    dayTasks: Task[],
-    duration: number,
-    excludeTaskId: string,
-  ): { time: string } | null {
-    const apptEnd = this.toMinutes(appointment.endTime);
-    const apptStart = this.toMinutes(appointment.startTime);
-
-    const busy: Array<{ start: number; end: number }> = [
-      { start: apptStart, end: apptEnd },
+  private buildBusyList(date: string, dayTasks: Task[], excludeTaskId: string, excludeApptId: string) {
+    return [
       ...dayTasks
         .filter(t => t.id !== excludeTaskId)
         .map(t => {
-          const s = this.toMinutes((t as any).time || '00:00');
+          const s = this.conflictResolver.toMinutes((t as any).time || '00:00');
           return { start: s, end: s + ((t as any).duration || 60) };
         }),
       ...this.appointments
-        .filter(a => a.date === appointment.date && a.id !== appointment.id)
-        .map(a => ({ start: this.toMinutes(a.startTime), end: this.toMinutes(a.endTime) })),
+        .filter(a => a.date === date && a.id !== excludeApptId)
+        .map(a => ({
+          start: this.conflictResolver.toMinutes(a.startTime),
+          end: this.conflictResolver.toMinutes(a.endTime),
+        })),
     ];
-
-    // Tentativa 1: depois do compromisso
-    let candidateStart = apptEnd;
-    let candidateEnd = candidateStart + duration;
-    if (candidateEnd <= this.toMinutes('23:59')) {
-      if (!this.overlapsAny(candidateStart, candidateEnd, busy)) {
-        return { time: this.fromMinutes(candidateStart) };
-      }
-    }
-
-    // Tentativa 2: antes do compromisso
-    candidateEnd = apptStart;
-    candidateStart = candidateEnd - duration;
-    if (candidateStart >= this.toMinutes('00:00')) {
-      if (!this.overlapsAny(candidateStart, candidateEnd, busy)) {
-        return { time: this.fromMinutes(candidateStart) };
-      }
-    }
-
-    return null;
-  }
-
-  private overlapsAny(start: number, end: number, busy: Array<{ start: number; end: number }>): boolean {
-    return busy.some(b => start < b.end && end > b.start);
-  }
-
-  private toMinutes(time: string): number {
-    const [h, m] = time.split(':').map(Number);
-    return h * 60 + (m || 0);
-  }
-
-  private fromMinutes(mins: number): string {
-    const h = Math.floor(mins / 60);
-    const m = mins % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   }
 
   private formatDate(date: string): string {
