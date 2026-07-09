@@ -7,6 +7,7 @@ import { GoalsModule } from './goals/goals.module';
 import { TasksModule } from './tasks/tasks.module';
 import { RoutinesModule } from './routines/routines.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
+import { CalendarModule } from './calendar/calendar.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
     TasksModule,
     RoutinesModule,
     SchedulerModule,
+    CalendarModule,
   ],
   controllers: [AppController],
   providers: [AppService],

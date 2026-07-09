@@ -3,8 +3,10 @@ import Link from 'next/link';
 export function Sidebar() {
   const menuItems = [
     { label: 'Dashboard', href: '/dashboard' },
+    { label: 'Hoje', href: '/hoje' },
     { label: 'Metas', href: '/metas' },
     { label: 'Rotinas', href: '/rotinas' },
+    { label: 'Calendário', href: '/calendario' },
     { label: 'Relatório', href: '/relatorio' },
   ];
 

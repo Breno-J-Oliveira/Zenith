@@ -1,6 +1,6 @@
 import { Controller, Post, Get, Body } from '@nestjs/common';
 import { AIService } from './ai.service';
-import { ParsedAIResult, AILogEntry } from '../../../../packages/shared/src/types';
+import { AILogEntry } from '../../../../packages/shared/src/types';
 
 @Controller('ai')
 export class AIController {
@@ -14,5 +14,10 @@ export class AIController {
   @Get('log')
   getLog(): AILogEntry[] {
     return this.aiService.getLog();
+  }
+
+  @Get('briefing')
+  async getBriefing() {
+    return this.aiService.getBriefing();
   }
 }

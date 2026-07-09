@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
-import { AIController } from './ai.controller';
-import { AIService } from './ai.service';
+import { CalendarController } from './calendar.controller';
+import { CalendarService } from './calendar.service';
 import { GoalsModule } from '../goals/goals.module';
 import { RoutinesModule } from '../routines/routines.module';
 import { SchedulerModule } from '../scheduler/scheduler.module';
 
 @Module({
   imports: [GoalsModule, RoutinesModule, SchedulerModule],
-  controllers: [AIController],
-  providers: [AIService],
+  controllers: [CalendarController],
+  providers: [CalendarService],
+  exports: [CalendarService],
 })
-export class AIModule {}
+export class CalendarModule {}

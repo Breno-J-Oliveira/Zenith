@@ -9,6 +9,7 @@ Aplicação fullstack de produtividade pessoal inspirada no Notion, com a IA com
 **Fase 2 — Quick Input + IA (núcleo)** ✅ Concluída
 **Fase 3 — Metas, Marcos & Tarefas** ✅ Concluída
 **Fase 4 — Rotinas & Reorganização Adaptativa** ✅ Concluída
+**Fase 5 — Calendário & Planejamento** ✅ Concluída
 
 ## Stack
 
@@ -34,6 +35,8 @@ zenith/
 │   │   │   ├── settings/         # Configurações + seletor de tema
 │   │   │   ├── metas/            # CRUD de metas + marcos + tarefas
 │   │   │   ├── rotinas/          # CRUD de rotinas + gerar tarefas
+│   │   │   ├── calendario/       # FullCalendar com drag-and-drop
+│   │   │   ├── hoje/             # Visão do dia + briefing IA
 │   │   │   └── relatorio/        # Placeholder
 │   │   ├── components/           # Header, Sidebar, Footer, ShellLayout, QuickInput
 │   │   └── lib/utils.ts          # cn() helper
@@ -64,6 +67,10 @@ zenith/
 │               ├── scheduler.module.ts
 │               ├── scheduler.controller.ts  # POST /appointments (cria + reorganiza)
 │               └── scheduler.service.ts     # Heurística de realocação de conflitos
+│           └── calendar/         # Módulo Calendário (agregador)
+│               ├── calendar.module.ts
+│               ├── calendar.controller.ts   # GET /calendar + PATCH /calendar/reschedule
+│               └── calendar.service.ts      # Agrega tasks+rotinas+compromissos, reschedule com reorganização
 ├── packages/
 │   └── shared/
 │       └── src/
@@ -127,6 +134,15 @@ Backend expõe:
 
 Página `/rotinas` com lista de rotinas, toggle ativa/pausada, botão de gerar tarefas. QuickInput mostra toast de reorganização quando um compromisso conflita com rotina existente.
 
+## Calendário & Planejamento
+
+Backend expõe:
+- `GET /calendar?from=DATE&to=DATE` — agrega eventos de 3 fontes (tasks de metas, tasks de rotina, appointments) num formato único
+- `PATCH /calendar/reschedule` — reagenda evento via drag-and-drop, com reorganização automática de conflitos
+- `GET /ai/briefing` — briefing diário gerado por Gemini (fallback determinístico se IA falhar)
+
+Página `/calendario` com FullCalendar (mensal/semanal/diário), drag-and-drop de tarefas, cores por tipo de evento, toast de reorganização em cascata. Página `/hoje` com lista do dia ordenada por horário, checkboxes para marcar done, e briefing da IA no topo.
+
 ## Como rodar
 
 ```bash
@@ -147,7 +163,7 @@ cd apps/backend && npm run dev
 - [x] **Fase 2** — Quick Input + IA: MockAIProvider, POST /ai/parse, QuickInput no dashboard, Gemini real com fallback
 - [x] **Fase 3** — Metas, Marcos & Tarefas: CRUD completo backend + frontend, progresso visual, filtros
 - [x] **Fase 4** — Rotinas & Reorganização Adaptativa: rotinas recorrentes, compromissos, heurística de reorganização de conflitos, toast no QuickInput
-- [ ] **Fase 5** — Calendário & Planejamento
+- [x] **Fase 5** — Calendário & Planejamento: FullCalendar com drag-and-drop, visão Hoje com briefing da IA, reagendamento com reorganização em cascata
 - [ ] **Fase 6** — Sistema de Blocos (Notion-like)
 - [ ] **Fase 7** — Gastos & Integração Dashboard Financeiro
 - [ ] **Fase 8** — Notificações & Lembretes
