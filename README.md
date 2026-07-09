@@ -6,6 +6,7 @@ Aplicação fullstack de produtividade pessoal inspirada no Notion, com a IA com
 
 **Fase 0 — Fundação** ✅ Concluída
 **Fase 1 — UI Shell + Telas Mock** ✅ Concluída
+**Fase 2 — Quick Input + IA (núcleo)** ✅ Concluída
 
 ## Stack
 
@@ -16,7 +17,7 @@ Aplicação fullstack de produtividade pessoal inspirada no Notion, com a IA com
 | Backend | NestJS, Node.js |
 | Gráficos | Recharts |
 | Monorepo | Turborepo |
-| Pacote compartilhado | @zenith/shared (tipos, auth mock, tema, logo) |
+| Pacote compartilhado | @zenith/shared (tipos, auth mock, AI mock, tema, logo) |
 
 ## Estrutura
 
@@ -27,23 +28,28 @@ zenith/
 │   │   ├── app/
 │   │   │   ├── (auth)/login/     # Tela de login (mock)
 │   │   │   ├── (auth)/register/  # Tela de cadastro (mock)
-│   │   │   ├── dashboard/        # Dashboard estático
+│   │   │   ├── dashboard/        # Dashboard com QuickInput + gráficos
 │   │   │   ├── settings/         # Configurações + seletor de tema
 │   │   │   ├── metas/            # Placeholder
 │   │   │   └── relatorio/        # Placeholder
-│   │   ├── components/           # Header, Sidebar, Footer, ShellLayout
+│   │   ├── components/           # Header, Sidebar, Footer, ShellLayout, QuickInput
 │   │   └── lib/utils.ts          # cn() helper
 │   └── backend/      # NestJS (porta 3002)
 │       └── src/
 │           ├── main.ts           # Bootstrap
 │           ├── app.module.ts
 │           ├── app.controller.ts # GET / + GET /health
-│           └── app.service.ts
+│           ├── app.service.ts
+│           └── ai/               # Módulo AI
+│               ├── ai.module.ts
+│               ├── ai.controller.ts  # POST /ai/parse + GET /ai/log
+│               └── ai.service.ts     # MockAIProvider + log em memória
 ├── packages/
 │   └── shared/
 │       └── src/
-│           ├── types/index.ts        # User, Session, AuthProvider, RegisterData
+│           ├── types/index.ts        # User, Session, AuthProvider, AIIntent, ParsedAIResult, AILogEntry
 │           ├── auth/index.ts         # MockAuthProvider
+│           ├── ai/index.ts           # MockAIProvider (parsing determinístico)
 │           ├── theme/tokens.css      # CSS variables (paletas red/violet/green)
 │           ├── components/Logo.tsx   # Logo SVG temável
 │           └── index.ts              # Export público
@@ -73,6 +79,10 @@ A troca é instantânea via JavaScript — sem reload. Todas as cores (logo, bot
 
 Usa `MockAuthProvider` — sempre sucesso, sem chamadas de rede. Sessão persistida em `localStorage`. Auth real (NexusAuth) será integrada em fase futura.
 
+## IA (Quick Input)
+
+Usa `MockAIProvider` com parsing determinístico por keywords/regex. Identifica intents: `LOG_EXPENSE`, `CREATE_EVENT`, `CREATE_GOAL`, `CREATE_TASK`, `UNKNOWN`. Backend expõe `POST /ai/parse` e `GET /ai/log`. Integração com OpenAI API (GPT-4o-mini) será feita quando houver API key disponível.
+
 ## Como rodar
 
 ```bash
@@ -83,14 +93,14 @@ npm install
 cd apps/web && npm run dev
 
 # Rodar backend (porta 3002)
-cd apps/backend && npm run start:dev
+cd apps/backend && npm run dev
 ```
 
 ## Fases
 
 - [x] **Fase 0** — Fundação: monorepo, tema, MockAuthProvider, Logo, backend skeleton
 - [x] **Fase 1** — UI Shell + telas mock: login, dashboard, settings, navegação
-- [ ] **Fase 2** — Quick Input + IA (núcleo)
+- [x] **Fase 2** — Quick Input + IA: MockAIProvider, POST /ai/parse, QuickInput no dashboard
 - [ ] **Fase 3** — Metas, Marcos & Tarefas
 - [ ] **Fase 4** — Rotinas & Reorganização Adaptativa
 - [ ] **Fase 5** — Calendário & Planejamento

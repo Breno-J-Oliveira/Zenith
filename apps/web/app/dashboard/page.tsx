@@ -1,6 +1,7 @@
 'use client';
 
 import { ShellLayout } from '../../components/ShellLayout';
+import { QuickInput } from '../../components/QuickInput';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
 
 const weeklyData = [
@@ -17,6 +18,8 @@ export default function DashboardPage() {
   return (
     <ShellLayout>
       <div className="p-8 max-w-5xl">
+        <QuickInput />
+
         {/* Avatar + greeting */}
         <div className="flex items-center gap-4 mb-8">
           <div className="w-16 h-16 rounded-full bg-[var(--color-surface-2)] border-2 border-[var(--color-primary)] flex items-center justify-center">
