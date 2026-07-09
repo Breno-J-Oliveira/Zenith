@@ -65,9 +65,46 @@
 
 ## Pendências
 
-- **OpenAI integration**: Substituir parsing determinístico por chamada real à OpenAI API (GPT-4o-mini). Necessário API key.
+- ~~**OpenAI integration**: Substituir parsing determinístico por chamada real à OpenAI API (GPT-4o-mini).~~ → **Resolvido**: Integração com Google Gemini implementada (commit cec9d58 + modelo ajustado). Ver adendo abaixo.
 - **Persistência**: AILog em memória — perde dados ao reiniciar backend. Prisma + Postgres vem em fase futura.
 - **Quick Input visual**: Posicionado como card no dashboard. Pode evoluir para FAB flutuante quando o design mobile for definido.
 - **Tratamento de erros**: Fetch simples sem retry. Considerar TanStack Query quando houver mais endpoints.
 - **Dívida técnica — import direto ignorando index.ts**: O backend importa de `packages/shared/src/ai` e `packages/shared/src/types` diretamente, ignorando o `index.ts` que exporta `Logo.tsx` (JSX incompatível com commonjs). Solução definitiva: separar `packages/shared` em dois sub-packages — `shared/core` (tipos, auth, ai — sem JSX, importável pelo backend) e `shared/ui` (Logo.tsx, componentes React — importável apenas pelo web). Isso elimina a necessidade de rootDir expandido e entryFile customizado no nest-cli.json.
 - **rootDir expandido no backend**: `rootDir: "../../"` + `entryFile` customizado são workaround para o import do shared. Se o shared for separado em core/ui, o backend volta a `rootDir: "src"` e `entryFile` default.
+
+---
+
+## Adendo — Integração Google Gemini (pós-Fase 2)
+
+### O que foi feito
+
+- **GeminiProvider** (`apps/backend/src/ai/gemini.provider.ts`): usa SDK oficial `@google/generative-ai` para chamar o modelo Gemini real
+- **Fallback automático**: se Gemini falha (503, 429, rede), cai no MockAIProvider sem o usuário perceber
+- **`@nestjs/config`**: carrega `.env` padronizadamente
+- **`.env.example`**: documenta a variável `GEMINI_API_KEY` sem expor a key real
+- **Segurança**: key nunca commitada, nunca logada, nunca vai para o frontend
+
+### Modelo Gemini usado
+
+- **Atual**: `gemini-2.5-flash` (constante `GEMINI_MODEL` no topo do `gemini.provider.ts`)
+- **Testado e funcionando no free tier** (julho/2026): 3 requisições consecutivas com 15s de intervalo, todas retornaram `source: "gemini"` com payload correto
+- **`gemini-2.0-flash`**: free tier zerado/descontinuado pelo Google (`limit: 0`, erro 429) — não usar
+- **`gemini-2.5-flash-lite`**: também funciona no free tier, mas estava com 503 (alta demanda) no momento dos testes
+- **`gemini-1.5-flash`**: não disponível na API v1beta (erro 404)
+
+### ⚠️ Nota importante sobre free tier do Google
+
+O Google altera frequentemente quais modelos estão disponíveis no free tier e seus limites de quota. Isso já aconteceu antes (gemini-2.0-flash tinha free tier ativo e foi zerado). **Recomendação**: ao integrar ou atualizar, verificar no [Google AI Studio](https://aistudio.google.com/) se o modelo ainda está no free tier antes de assumir que vai continuar funcionando. A constante `GEMINI_MODEL` no topo do arquivo facilita a troca.
+
+### Resultado dos testes (10/07/2026, ~10:04 UTC-3)
+
+| Input | Intent | Confidence | Source | Payload |
+|---|---|---|---|---|
+| "gastei 30 no uber" | LOG_EXPENSE | 0.95 | gemini | amount: 30, category: "transporte" |
+| "reuniao dia 23 as 14h" | CREATE_EVENT | 0.9 | gemini | title: "reuniao", date: "2026-07-23", time: "14:00" |
+| "tenho que entregar o TCC" | CREATE_TASK | 0.9 | gemini | title: "entregar o TCC", date: "2026-07-09" |
+
+### Fallback testado
+
+- Backend sem `.env` (sem key): `GeminiProvider não inicializado` → cai direto no mock, endpoint funciona normal
+- Gemini retorna 503 (alta demanda): `Gemini falhou` → cai no mock automaticamente, endpoint não quebra

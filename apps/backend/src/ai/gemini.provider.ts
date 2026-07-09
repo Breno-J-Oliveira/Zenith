@@ -1,6 +1,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ParsedAIResult, AIIntent, ExpensePayload, GoalPayload, TaskPayload, EventPayload } from '../../../../packages/shared/src/types';
 
+const GEMINI_MODEL = 'gemini-2.5-flash';
+
 const SYSTEM_PROMPT = `Você é o orquestrador do Zenith, um app de produtividade.
 Receba o texto do usuário em linguagem natural e identifique a intenção.
 
@@ -42,7 +44,7 @@ export class GeminiProvider {
       throw new Error('GEMINI_API_KEY não configurada. Crie apps/backend/.env com GEMINI_API_KEY=sua_key');
     }
     this.genAI = new GoogleGenerativeAI(apiKey);
-    this.model = 'gemini-2.0-flash';
+    this.model = GEMINI_MODEL;
   }
 
   async parse(text: string): Promise<ParsedAIResult> {
@@ -56,7 +58,8 @@ export class GeminiProvider {
     const responseText = result.response.text().trim();
 
     try {
-      const parsed = JSON.parse(responseText);
+      const jsonStr = this.extractJson(responseText);
+      const parsed = JSON.parse(jsonStr);
       return this.validateResult(parsed, text);
     } catch {
       return {
@@ -66,6 +69,14 @@ export class GeminiProvider {
         rawText: text,
       };
     }
+  }
+
+  private extractJson(text: string): string {
+    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (codeBlockMatch) return codeBlockMatch[1].trim();
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) return jsonMatch[0];
+    return text;
   }
 
   private validateResult(parsed: any, rawText: string): ParsedAIResult {
