@@ -12,7 +12,7 @@ export class AIController {
   }
 
   @Get('log')
-  getLog(): AILogEntry[] {
+  async getLog(): Promise<AILogEntry[]> {
     return this.aiService.getLog();
   }
 

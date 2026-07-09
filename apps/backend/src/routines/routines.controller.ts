@@ -12,7 +12,7 @@ export class RoutinesController {
   constructor(private readonly routinesService: RoutinesService) {}
 
   @Post()
-  create(@Body() dto: CreateRoutineDTO): Routine {
+  async create(@Body() dto: CreateRoutineDTO): Promise<Routine> {
     return this.routinesService.create(dto);
   }
 
@@ -23,19 +23,19 @@ export class RoutinesController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string): Routine {
+  async findOne(@Param('id') id: string): Promise<Routine> {
     return this.routinesService.findOne(id);
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateRoutineDTO): Routine {
+  async update(@Param('id') id: string, @Body() dto: UpdateRoutineDTO): Promise<Routine> {
     return this.routinesService.update(id, dto);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) {
-    this.routinesService.remove(id);
+  async remove(@Param('id') id: string) {
+    await this.routinesService.remove(id);
   }
 
   @Post(':id/generate-tasks')

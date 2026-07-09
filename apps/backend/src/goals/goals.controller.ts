@@ -37,13 +37,13 @@ export class GoalsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) {
-    this.goalsService.remove(id);
+  async remove(@Param('id') id: string) {
+    await this.goalsService.remove(id);
   }
 
   @Get(':id/progress')
-  getProgress(@Param('id') id: string) {
-    return { progress: this.goalsService.getProgress(id) };
+  async getProgress(@Param('id') id: string) {
+    return { progress: await this.goalsService.getProgress(id) };
   }
 
   @Post(':id/milestones')
@@ -61,10 +61,10 @@ export class GoalsController {
 
   @Delete(':id/milestones/:milestoneId')
   @HttpCode(HttpStatus.NO_CONTENT)
-  removeMilestone(
+  async removeMilestone(
     @Param('id') id: string,
     @Param('milestoneId') milestoneId: string,
   ) {
-    this.goalsService.removeMilestone(id, milestoneId);
+    await this.goalsService.removeMilestone(id, milestoneId);
   }
 }

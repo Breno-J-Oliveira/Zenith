@@ -7,6 +7,7 @@ export function Sidebar() {
     { label: 'Metas', href: '/metas' },
     { label: 'Rotinas', href: '/rotinas' },
     { label: 'Calendário', href: '/calendario' },
+    { label: 'Páginas', href: '/paginas' },
     { label: 'Relatório', href: '/relatorio' },
   ];
 

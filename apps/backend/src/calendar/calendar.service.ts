@@ -36,11 +36,11 @@ export class CalendarService {
     private readonly conflictResolver: ConflictResolver,
   ) {}
 
-  getEvents(from: string, to: string): CalendarEvent[] {
+  async getEvents(from: string, to: string): Promise<CalendarEvent[]> {
     const events: CalendarEvent[] = [];
 
     // Tasks from goals (with date)
-    const goalsTasks = this.goalsService.getTasks();
+    const goalsTasks = await this.goalsService.getTasks();
     for (const task of goalsTasks) {
       if (!task.date) continue;
       if (task.date >= from && task.date <= to) {
@@ -57,7 +57,7 @@ export class CalendarService {
     }
 
     // Tasks from routines (generated)
-    const routineTasks = this.routinesService.getGeneratedTasks();
+    const routineTasks = await this.routinesService.getGeneratedTasks();
     for (const task of routineTasks) {
       if (!task.date) continue;
       if (task.date >= from && task.date <= to) {
@@ -77,7 +77,7 @@ export class CalendarService {
     }
 
     // Appointments
-    const appointments = this.schedulerService.findAll();
+    const appointments = await this.schedulerService.findAll();
     for (const appt of appointments) {
       if (appt.date >= from && appt.date <= to) {
         events.push({
@@ -94,7 +94,7 @@ export class CalendarService {
     return events.sort((a, b) => a.start.localeCompare(b.start));
   }
 
-  reschedule(dto: RescheduleDTO): RescheduleResult {
+  async reschedule(dto: RescheduleDTO): Promise<RescheduleResult> {
     const newDate = dto.newStart.split('T')[0];
     const newTime = dto.newStart.split('T')[1]?.substring(0, 5) || '08:00';
 
@@ -102,15 +102,13 @@ export class CalendarService {
     const sourceId = dto.eventId.replace(/^cal-(task|rtask|appt)-/, '');
 
     if (dto.type === 'task') {
-      const task = this.routinesService.updateGeneratedTask(sourceId, {
+      const task = await this.routinesService.updateGeneratedTask(sourceId, {
         date: newDate,
+        time: newTime,
       } as any);
-      if (task) {
-        (task as any).time = newTime;
-      }
 
       // Check for conflicts with other events on the new date
-      const dayTasks = this.routinesService.getTasksForDate(newDate);
+      const dayTasks = await this.routinesService.getTasksForDate(newDate);
       const moved: RescheduleResult['moved'] = [];
 
       const taskDuration = (task as any)?.duration || 60;
@@ -125,7 +123,7 @@ export class CalendarService {
         const otherEnd = otherStart + otherDuration;
 
         if (this.conflictResolver.hasConflict(taskStart, taskEnd, otherStart, otherEnd)) {
-          const busy = this.buildBusyListForDate(newDate, other.id, sourceId);
+          const busy = await this.buildBusyListForDate(newDate, other.id, sourceId);
           const newSlot = this.conflictResolver.findFreeSlot({
             conflictStart: taskStart,
             conflictEnd: taskEnd,
@@ -133,7 +131,7 @@ export class CalendarService {
             busy,
           });
           if (newSlot) {
-            (other as any).time = newSlot.time;
+            await this.routinesService.updateGeneratedTask(other.id, { time: newSlot.time } as any);
             moved.push({
               taskId: other.id,
               taskTitle: other.title,
@@ -176,8 +174,8 @@ export class CalendarService {
     return { event: null as any, moved: [], message: 'Tipo de evento desconhecido.' };
   }
 
-  private buildBusyListForDate(date: string, excludeTaskId: string, alsoExcludeTaskId: string) {
-    const dayTasks = this.routinesService.getTasksForDate(date);
+  private async buildBusyListForDate(date: string, excludeTaskId: string, alsoExcludeTaskId: string) {
+    const dayTasks = await this.routinesService.getTasksForDate(date);
     const busy = dayTasks
       .filter(t => t.id !== excludeTaskId && t.id !== alsoExcludeTaskId)
       .map(t => {
@@ -185,8 +183,8 @@ export class CalendarService {
         return { start: s, end: s + ((t as any).duration || 60) };
       });
 
-    const appointments = this.schedulerService.findAll().filter(a => a.date === date);
-    for (const appt of appointments) {
+    const appointments = await this.schedulerService.findAll();
+    for (const appt of appointments.filter(a => a.date === date)) {
       busy.push({
         start: this.conflictResolver.toMinutes(appt.startTime),
         end: this.conflictResolver.toMinutes(appt.endTime),

@@ -6,10 +6,10 @@ import { GeminiProvider } from './gemini.provider';
 import { GoalsService } from '../goals/goals.service';
 import { RoutinesService } from '../routines/routines.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
+import { PrismaService, MOCK_USER_ID } from '../prisma.service';
 
 @Injectable()
 export class AIService {
-  private log: AILogEntry[] = [];
   private readonly logger = new Logger(AIService.name);
   private geminiProvider: GeminiProvider | null = null;
 
@@ -17,6 +17,7 @@ export class AIService {
     private readonly goalsService: GoalsService,
     private readonly routinesService: RoutinesService,
     private readonly schedulerService: SchedulerService,
+    private readonly prisma: PrismaService,
   ) {
     try {
       this.geminiProvider = new GeminiProvider();
@@ -47,7 +48,7 @@ export class AIService {
 
     if (result.intent === 'CREATE_ROUTINE' && result.payload) {
       const payload = result.payload as RoutinePayload;
-      const routine = this.routinesService.create({
+      const routine = await this.routinesService.create({
         title: payload.title,
         frequency: payload.frequency,
         time: payload.time,
@@ -58,7 +59,7 @@ export class AIService {
 
     if (result.intent === 'CREATE_APPOINTMENT' && result.payload) {
       const payload = result.payload as AppointmentPayload;
-      const reorgResult = this.schedulerService.createAppointment({
+      const reorgResult = await this.schedulerService.createAppointment({
         title: payload.title,
         date: payload.date,
         startTime: payload.startTime,
@@ -67,41 +68,55 @@ export class AIService {
       sideEffect = { type: 'appointment_created', reorganization: reorgResult };
     }
 
-    const entry: AILogEntry = {
-      id: `log-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      input: text,
-      result,
-    };
-    this.log.push(entry);
+    await this.prisma.aILog.create({
+      data: {
+        userId: MOCK_USER_ID,
+        input: text,
+        result: JSON.stringify(result),
+      },
+    });
 
     return { ...result, source, sideEffect };
   }
 
-  getLog(): AILogEntry[] {
-    return this.log;
+  async getLog(): Promise<AILogEntry[]> {
+    const records = await this.prisma.aILog.findMany({
+      where: { userId: MOCK_USER_ID },
+      orderBy: { timestamp: 'desc' },
+      take: 50,
+    });
+    return records.map(r => ({
+      id: r.id,
+      timestamp: r.timestamp.toISOString(),
+      input: r.input,
+      result: JSON.parse(r.result),
+    }));
   }
 
   async getBriefing(): Promise<{ text: string; source: 'gemini' | 'template' }> {
     const today = new Date().toISOString().split('T')[0];
 
-    const goals = this.goalsService.findAll({ status: 'ACTIVE' as any });
-    const routineTasks = this.routinesService.getTasksForDate(today);
-    const goalTasks = this.goalsService.getTasks().filter(t => t.date === today);
-    const appointments = this.schedulerService.findAll().filter(a => a.date === today);
+    const goals = await this.goalsService.findAll({ status: 'ACTIVE' as any });
+    const routineTasks = await this.routinesService.getTasksForDate(today);
+    const goalTasks = await this.goalsService.getTasks();
+    const todayGoalTasks = goalTasks.filter(t => t.date === today);
+    const appointments = await this.schedulerService.findAll();
+    const todayAppointments = appointments.filter(a => a.date === today);
 
     const allTodayItems = [
       ...routineTasks.map(t => ({ title: t.title, time: (t as any).time || '—', type: 'rotina' })),
-      ...goalTasks.map(t => ({ title: t.title, time: '—', type: 'tarefa' })),
-      ...appointments.map(a => ({ title: a.title, time: `${a.startTime}-${a.endTime}`, type: 'compromisso' })),
+      ...todayGoalTasks.map(t => ({ title: t.title, time: '—', type: 'tarefa' })),
+      ...todayAppointments.map(a => ({ title: a.title, time: `${a.startTime}-${a.endTime}`, type: 'compromisso' })),
     ].sort((a, b) => a.time.localeCompare(b.time));
 
-    const activeRoutines = this.routinesService.findAll({ active: true });
+    const activeRoutines = await this.routinesService.findAll({ active: true });
 
-    const goalProgress = goals.map(g => ({
-      title: g.title,
-      progress: this.goalsService.getProgress(g.id),
-    }));
+    const goalProgress = await Promise.all(
+      goals.map(async g => ({
+        title: g.title,
+        progress: await this.goalsService.getProgress(g.id),
+      }))
+    );
 
     // Try Gemini first
     if (this.geminiProvider) {
@@ -135,8 +150,8 @@ Gere apenas o texto do briefing, sem JSON.`;
     // Fallback template
     const parts: string[] = [];
     parts.push(`Bom dia! Você tem ${allTodayItems.length} ${allTodayItems.length === 1 ? 'item' : 'itens'} hoje`);
-    if (appointments.length > 0) {
-      parts.push(`, incluindo ${appointments.map(a => `${a.title} às ${a.startTime}`).join(' e ')}`);
+    if (todayAppointments.length > 0) {
+      parts.push(`, incluindo ${todayAppointments.map(a => `${a.title} às ${a.startTime}`).join(' e ')}`);
     }
     parts.push('.');
     if (goalProgress.length > 0) {

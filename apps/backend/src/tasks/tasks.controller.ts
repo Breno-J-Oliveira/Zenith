@@ -41,7 +41,7 @@ export class TasksController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id') id: string) {
-    this.tasksService.remove(id);
+  async remove(@Param('id') id: string) {
+    await this.tasksService.remove(id);
   }
 }

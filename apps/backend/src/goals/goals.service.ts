@@ -1,159 +1,194 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService, MOCK_USER_ID } from '../prisma.service';
 import {
   Goal, Milestone, Task,
   CreateGoalDTO, UpdateGoalDTO, CreateMilestoneDTO,
-  GoalStatus, GoalCategory,
+  GoalStatus, GoalCategory, TaskStatus,
 } from '../../../../packages/shared/src/types';
 
 @Injectable()
 export class GoalsService {
-  private goals: Goal[] = [];
-  private tasks: Task[] = [];
+  constructor(private readonly prisma: PrismaService) {}
 
-  create(dto: CreateGoalDTO): Goal {
-    const now = new Date().toISOString();
-    const goal: Goal = {
-      id: `goal-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: dto.title,
-      description: dto.description,
-      category: (dto.category || 'pessoal') as GoalCategory,
-      priority: dto.priority || 'media',
-      status: 'ACTIVE' as GoalStatus,
-      deadline: dto.deadline,
-      milestones: [],
-      tasks: [],
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.goals.push(goal);
-    return goal;
-  }
-
-  findAll(filter?: { status?: GoalStatus; category?: GoalCategory }): Goal[] {
-    return this.goals.filter(g => {
-      if (filter?.status && g.status !== filter.status) return false;
-      if (filter?.category && g.category !== filter.category) return false;
-      return true;
+  async create(dto: CreateGoalDTO): Promise<Goal> {
+    const record = await this.prisma.goal.create({
+      data: {
+        userId: MOCK_USER_ID,
+        title: dto.title,
+        description: dto.description,
+        category: (dto.category || 'pessoal') as string,
+        priority: (dto.priority || 'media') as string,
+        status: 'ACTIVE',
+        deadline: dto.deadline,
+      },
+      include: { milestones: true, tasks: true },
     });
+    return this.toGoal(record);
   }
 
-  findOne(id: string): Goal {
-    const goal = this.goals.find(g => g.id === id);
-    if (!goal) throw new NotFoundException(`Goal ${id} not found`);
-    return goal;
+  async findAll(filter?: { status?: GoalStatus; category?: GoalCategory }): Promise<Goal[]> {
+    const records = await this.prisma.goal.findMany({
+      where: {
+        userId: MOCK_USER_ID,
+        ...(filter?.status && { status: filter.status }),
+        ...(filter?.category && { category: filter.category }),
+      },
+      include: { milestones: true, tasks: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map(r => this.toGoal(r));
   }
 
-  update(id: string, dto: UpdateGoalDTO): Goal {
-    const goal = this.findOne(id);
-    if (dto.title !== undefined) goal.title = dto.title;
-    if (dto.description !== undefined) goal.description = dto.description;
-    if (dto.category !== undefined) goal.category = dto.category;
-    if (dto.priority !== undefined) goal.priority = dto.priority;
-    if (dto.status !== undefined) goal.status = dto.status;
-    if (dto.deadline !== undefined) goal.deadline = dto.deadline;
-    goal.updatedAt = new Date().toISOString();
-    return goal;
+  async findOne(id: string): Promise<Goal> {
+    const record = await this.prisma.goal.findUnique({
+      where: { id },
+      include: { milestones: true, tasks: true },
+    });
+    if (!record) throw new NotFoundException(`Goal ${id} not found`);
+    return this.toGoal(record);
   }
 
-  remove(id: string): void {
-    const idx = this.goals.findIndex(g => g.id === id);
-    if (idx === -1) throw new NotFoundException(`Goal ${id} not found`);
-    this.goals.splice(idx, 1);
-    this.tasks = this.tasks.filter(t => t.goalId !== id);
+  async update(id: string, dto: UpdateGoalDTO): Promise<Goal> {
+    const record = await this.prisma.goal.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.category !== undefined && { category: dto.category }),
+        ...(dto.priority !== undefined && { priority: dto.priority }),
+        ...(dto.status !== undefined && { status: dto.status }),
+        ...(dto.deadline !== undefined && { deadline: dto.deadline }),
+      },
+      include: { milestones: true, tasks: true },
+    });
+    return this.toGoal(record);
   }
 
-  getProgress(goalId: string): number {
-    const goal = this.findOne(goalId);
-    const items: { completed: boolean }[] = [...goal.milestones, ...this.tasks.filter(t => t.goalId === goalId)];
+  async remove(id: string): Promise<void> {
+    await this.findOne(id);
+    await this.prisma.goal.delete({ where: { id } });
+  }
+
+  async getProgress(goalId: string): Promise<number> {
+    const goal = await this.findOne(goalId);
+    const items: { completed: boolean }[] = [...goal.milestones, ...goal.tasks];
     if (items.length === 0) return 0;
     const done = items.filter(i => i.completed).length;
     return Math.round((done / items.length) * 100);
   }
 
-  addMilestone(goalId: string, dto: CreateMilestoneDTO): Milestone {
-    const goal = this.findOne(goalId);
-    const milestone: Milestone = {
-      id: `ms-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      goalId,
-      title: dto.title,
-      deadline: dto.deadline,
-      completed: false,
-      createdAt: new Date().toISOString(),
+  async addMilestone(goalId: string, dto: CreateMilestoneDTO): Promise<Milestone> {
+    const record = await this.prisma.milestone.create({
+      data: { goalId, title: dto.title, deadline: dto.deadline },
+    });
+    await this.prisma.goal.update({ where: { id: goalId }, data: { updatedAt: new Date() } });
+    return this.toMilestone(record);
+  }
+
+  async toggleMilestone(goalId: string, milestoneId: string): Promise<Milestone> {
+    const ms = await this.prisma.milestone.findUnique({ where: { id: milestoneId } });
+    if (!ms || ms.goalId !== goalId) throw new NotFoundException(`Milestone ${milestoneId} not found in goal ${goalId}`);
+    const updated = await this.prisma.milestone.update({
+      where: { id: milestoneId },
+      data: { completed: !ms.completed },
+    });
+    await this.prisma.goal.update({ where: { id: goalId }, data: { updatedAt: new Date() } });
+    return this.toMilestone(updated);
+  }
+
+  async removeMilestone(goalId: string, milestoneId: string): Promise<void> {
+    const ms = await this.prisma.milestone.findUnique({ where: { id: milestoneId } });
+    if (!ms || ms.goalId !== goalId) throw new NotFoundException(`Milestone ${milestoneId} not found in goal ${goalId}`);
+    await this.prisma.milestone.delete({ where: { id: milestoneId } });
+    await this.prisma.goal.update({ where: { id: goalId }, data: { updatedAt: new Date() } });
+  }
+
+  async getTasks(): Promise<Task[]> {
+    const records = await this.prisma.task.findMany({
+      where: { userId: MOCK_USER_ID, goalId: { not: null } },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map(r => this.toTask(r));
+  }
+
+  async addTask(task: Task): Promise<void> {
+    await this.prisma.task.create({
+      data: {
+        id: task.id,
+        userId: MOCK_USER_ID,
+        goalId: task.goalId || null,
+        milestoneId: task.milestoneId || null,
+        title: task.title,
+        description: task.description || null,
+        status: task.status,
+        date: task.date || null,
+        completed: task.completed,
+      },
+    });
+  }
+
+  async findTask(id: string): Promise<Task> {
+    const record = await this.prisma.task.findUnique({ where: { id } });
+    if (!record) throw new NotFoundException(`Task ${id} not found`);
+    return this.toTask(record);
+  }
+
+  async updateTask(id: string, dto: Partial<Task>): Promise<Task> {
+    const record = await this.prisma.task.update({
+      where: { id },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.status !== undefined && { status: dto.status }),
+        ...(dto.completed !== undefined && { completed: dto.completed }),
+        ...(dto.date !== undefined && { date: dto.date }),
+      },
+    });
+    return this.toTask(record);
+  }
+
+  async removeTask(id: string): Promise<void> {
+    await this.prisma.task.delete({ where: { id } });
+  }
+
+  private toGoal(r: any): Goal {
+    return {
+      id: r.id,
+      title: r.title,
+      description: r.description || undefined,
+      category: r.category as GoalCategory,
+      priority: r.priority as 'baixa' | 'media' | 'alta',
+      status: r.status as GoalStatus,
+      deadline: r.deadline || undefined,
+      milestones: (r.milestones || []).map((m: any) => this.toMilestone(m)),
+      tasks: (r.tasks || []).map((t: any) => this.toTask(t)),
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt.toISOString(),
     };
-    goal.milestones.push(milestone);
-    goal.updatedAt = new Date().toISOString();
-    return milestone;
   }
 
-  toggleMilestone(goalId: string, milestoneId: string): Milestone {
-    const goal = this.findOne(goalId);
-    const ms = goal.milestones.find(m => m.id === milestoneId);
-    if (!ms) throw new NotFoundException(`Milestone ${milestoneId} not found in goal ${goalId}`);
-    ms.completed = !ms.completed;
-    goal.updatedAt = new Date().toISOString();
-    return ms;
+  private toMilestone(r: any): Milestone {
+    return {
+      id: r.id,
+      goalId: r.goalId,
+      title: r.title,
+      deadline: r.deadline || undefined,
+      completed: r.completed,
+      createdAt: r.createdAt.toISOString(),
+    };
   }
 
-  removeMilestone(goalId: string, milestoneId: string): void {
-    const goal = this.findOne(goalId);
-    const idx = goal.milestones.findIndex(m => m.id === milestoneId);
-    if (idx === -1) throw new NotFoundException(`Milestone ${milestoneId} not found in goal ${goalId}`);
-    goal.milestones.splice(idx, 1);
-    goal.updatedAt = new Date().toISOString();
-  }
-
-  addTaskToGoal(goalId: string, task: Task): void {
-    const goal = this.findOne(goalId);
-    goal.tasks.push(task);
-    goal.updatedAt = new Date().toISOString();
-  }
-
-  removeTaskFromGoal(goalId: string, taskId: string): void {
-    const goal = this.findOne(goalId);
-    goal.tasks = goal.tasks.filter(t => t.id !== taskId);
-    goal.updatedAt = new Date().toISOString();
-  }
-
-  getTasks(): Task[] {
-    return this.tasks;
-  }
-
-  addTask(task: Task): void {
-    this.tasks.push(task);
-    if (task.goalId) {
-      this.addTaskToGoal(task.goalId, task);
-    }
-  }
-
-  findTask(id: string): Task {
-    const task = this.tasks.find(t => t.id === id);
-    if (!task) throw new NotFoundException(`Task ${id} not found`);
-    return task;
-  }
-
-  updateTask(id: string, dto: Partial<Task>): Task {
-    const task = this.findTask(id);
-    if (dto.title !== undefined) task.title = dto.title;
-    if (dto.description !== undefined) task.description = dto.description;
-    if (dto.status !== undefined) task.status = dto.status;
-    if (dto.completed !== undefined) task.completed = dto.completed;
-    if (dto.date !== undefined) task.date = dto.date;
-    if (task.goalId) {
-      const goal = this.findOne(task.goalId);
-      const gt = goal.tasks.find(t => t.id === id);
-      if (gt) {
-        gt.completed = task.completed;
-        gt.status = task.status;
-      }
-    }
-    return task;
-  }
-
-  removeTask(id: string): void {
-    const task = this.findTask(id);
-    this.tasks = this.tasks.filter(t => t.id !== id);
-    if (task.goalId) {
-      this.removeTaskFromGoal(task.goalId, id);
-    }
+  private toTask(r: any): Task {
+    return {
+      id: r.id,
+      goalId: r.goalId || undefined,
+      milestoneId: r.milestoneId || undefined,
+      title: r.title,
+      description: r.description || undefined,
+      status: r.status as TaskStatus,
+      date: r.date || undefined,
+      completed: r.completed,
+      createdAt: r.createdAt.toISOString(),
+    };
   }
 }

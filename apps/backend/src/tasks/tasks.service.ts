@@ -1,54 +1,76 @@
 import { Injectable } from '@nestjs/common';
 import { GoalsService } from '../goals/goals.service';
+import { PrismaService, MOCK_USER_ID } from '../prisma.service';
 import {
   Task, CreateTaskDTO, UpdateTaskDTO, TaskStatus,
 } from '../../../../packages/shared/src/types';
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly goalsService: GoalsService) {}
+  constructor(
+    private readonly goalsService: GoalsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
-  create(dto: CreateTaskDTO): Task {
-    const task: Task = {
-      id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      title: dto.title,
-      description: dto.description,
-      goalId: dto.goalId,
-      milestoneId: dto.milestoneId,
-      date: dto.date,
-      status: 'ACTIVE' as TaskStatus,
-      completed: false,
-      createdAt: new Date().toISOString(),
-    };
-    this.goalsService.addTask(task);
-    return task;
-  }
-
-  findAll(filter?: { goalId?: string; status?: TaskStatus }): Task[] {
-    return this.goalsService.getTasks().filter(t => {
-      if (filter?.goalId && t.goalId !== filter.goalId) return false;
-      if (filter?.status && t.status !== filter.status) return false;
-      return true;
+  async create(dto: CreateTaskDTO): Promise<Task> {
+    const record = await this.prisma.task.create({
+      data: {
+        userId: MOCK_USER_ID,
+        goalId: dto.goalId || null,
+        milestoneId: dto.milestoneId || null,
+        title: dto.title,
+        description: dto.description || null,
+        date: dto.date || null,
+        status: 'ACTIVE',
+        completed: false,
+      },
     });
+    return this.toTask(record);
   }
 
-  findOne(id: string): Task {
+  async findAll(filter?: { goalId?: string; status?: TaskStatus }): Promise<Task[]> {
+    const records = await this.prisma.task.findMany({
+      where: {
+        userId: MOCK_USER_ID,
+        ...(filter?.goalId && { goalId: filter.goalId }),
+        ...(filter?.status && { status: filter.status }),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return records.map(r => this.toTask(r));
+  }
+
+  async findOne(id: string): Promise<Task> {
     return this.goalsService.findTask(id);
   }
 
-  update(id: string, dto: UpdateTaskDTO): Task {
+  async update(id: string, dto: UpdateTaskDTO): Promise<Task> {
     return this.goalsService.updateTask(id, dto);
   }
 
-  toggle(id: string): Task {
-    const task = this.findOne(id);
+  async toggle(id: string): Promise<Task> {
+    const task = await this.findOne(id);
     return this.goalsService.updateTask(id, {
       completed: !task.completed,
-      status: !task.completed ? 'COMPLETED' as TaskStatus : 'ACTIVE' as TaskStatus,
+      status: !task.completed ? ('COMPLETED' as TaskStatus) : ('ACTIVE' as TaskStatus),
     });
   }
 
-  remove(id: string): void {
-    this.goalsService.removeTask(id);
+  async remove(id: string): Promise<void> {
+    await this.goalsService.removeTask(id);
+  }
+
+  private toTask(r: any): Task {
+    return {
+      id: r.id,
+      goalId: r.goalId || undefined,
+      milestoneId: r.milestoneId || undefined,
+      title: r.title,
+      description: r.description || undefined,
+      status: r.status as TaskStatus,
+      date: r.date || undefined,
+      completed: r.completed,
+      createdAt: r.createdAt.toISOString(),
+    };
   }
 }

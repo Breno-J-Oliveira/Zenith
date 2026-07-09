@@ -1,0 +1,161 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User (mock, sem auth real ainda) ───
+model User {
+  id           String   @id @default(cuid())
+  email        String
+  name         String
+  avatar       String?
+  theme        String   @default("red")
+  createdAt    DateTime @default(now())
+
+  goals        Goal[]
+  routines     Routine[]
+  appointments Appointment[]
+  aiLogs       AILog[]
+  pages        Page[]
+}
+
+// ─── Goal ───
+model Goal {
+  id          String       @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  category    String       @default("pessoal")
+  priority    String       @default("media")
+  status      String       @default("ACTIVE")
+  deadline    String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  milestones  Milestone[]
+  tasks       Task[]
+
+  @@index([userId])
+}
+
+// ─── Milestone ───
+model Milestone {
+  id        String   @id @default(cuid())
+  goalId    String
+  title     String
+  deadline  String?
+  completed Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([goalId])
+}
+
+// ─── Task (de metas + de rotinas) ───
+model Task {
+  id          String   @id @default(cuid())
+  userId      String
+  goalId      String?
+  milestoneId String?
+  routineId   String?
+  title       String
+  description String?
+  status      String   @default("ACTIVE")
+  date        String?
+  completed   Boolean  @default(false)
+  time        String?  // horário para tasks de rotina (ex: "14:00")
+  duration    Int?     // duração em minutos para tasks de rotina
+  createdAt   DateTime @default(now())
+
+  goal        Goal?    @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([goalId])
+  @@index([routineId])
+  @@index([date])
+}
+
+// ─── Routine ───
+model Routine {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  frequency String   @default("daily")
+  time      String
+  duration  Int      @default(60)
+  active    Boolean  @default(true)
+  adaptable Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Appointment ───
+model Appointment {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  date      String
+  startTime String
+  endTime   String
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([date])
+}
+
+// ─── AILog ───
+model AILog {
+  id        String   @id @default(cuid())
+  userId    String?
+  timestamp DateTime @default(now())
+  input     String
+  result    String   // JSON serializado de ParsedAIResult
+
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ─── Page (Notion-like) ───
+model Page {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String   @default("Sem título")
+  parentId  String?
+  icon      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent    Page?    @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children  Page[]   @relation("PageTree")
+  blocks    Block[]
+
+  @@index([userId])
+  @@index([parentId])
+}
+
+// ─── Block ───
+model Block {
+  id        String   @id @default(cuid())
+  pageId    String
+  type      String   // heading, text, todo, task_ref, goal_ref, image, divider
+  content   String   // JSON flexível por tipo
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId])
+}

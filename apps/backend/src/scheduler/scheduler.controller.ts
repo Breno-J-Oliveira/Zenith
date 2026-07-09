@@ -12,12 +12,12 @@ export class SchedulerController {
   constructor(private readonly schedulerService: SchedulerService) {}
 
   @Post()
-  create(@Body() dto: CreateAppointmentDTO): ReorganizationResult {
+  async create(@Body() dto: CreateAppointmentDTO): Promise<ReorganizationResult> {
     return this.schedulerService.createAppointment(dto);
   }
 
   @Get()
-  findAll(): Appointment[] {
+  async findAll(): Promise<Appointment[]> {
     return this.schedulerService.findAll();
   }
 }
