@@ -32,6 +32,8 @@ export type AIIntent =
   | 'CREATE_TASK'
   | 'LOG_EXPENSE'
   | 'CREATE_EVENT'
+  | 'CREATE_ROUTINE'
+  | 'CREATE_APPOINTMENT'
   | 'UNKNOWN';
 
 export interface ExpensePayload {
@@ -58,7 +60,21 @@ export interface EventPayload {
   time?: string;
 }
 
-export type AIPayload = ExpensePayload | GoalPayload | TaskPayload | EventPayload | null;
+export interface RoutinePayload {
+  title: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  time: string;
+  duration?: number;
+}
+
+export interface AppointmentPayload {
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+export type AIPayload = ExpensePayload | GoalPayload | TaskPayload | EventPayload | RoutinePayload | AppointmentPayload | null;
 
 export interface ParsedAIResult {
   intent: AIIntent;
@@ -151,4 +167,62 @@ export interface UpdateTaskDTO {
   status?: TaskStatus;
   completed?: boolean;
   date?: string;
+}
+
+export type RoutineFrequency = 'daily' | 'weekly' | 'monthly';
+
+export interface Routine {
+  id: string;
+  title: string;
+  frequency: RoutineFrequency;
+  time: string;
+  duration: number;
+  active: boolean;
+  adaptable: boolean;
+  createdAt: string;
+}
+
+export interface CreateRoutineDTO {
+  title: string;
+  frequency?: RoutineFrequency;
+  time: string;
+  duration?: number;
+}
+
+export interface UpdateRoutineDTO {
+  title?: string;
+  frequency?: RoutineFrequency;
+  time?: string;
+  duration?: number;
+  active?: boolean;
+  adaptable?: boolean;
+}
+
+export interface Appointment {
+  id: string;
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  createdAt: string;
+}
+
+export interface CreateAppointmentDTO {
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface MovedTask {
+  taskId: string;
+  taskTitle: string;
+  from: { date: string; time: string };
+  to: { date: string; time: string };
+}
+
+export interface ReorganizationResult {
+  appointment: Appointment;
+  moved: MovedTask[];
+  message: string;
 }

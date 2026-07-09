@@ -8,6 +8,7 @@ Aplicação fullstack de produtividade pessoal inspirada no Notion, com a IA com
 **Fase 1 — UI Shell + Telas Mock** ✅ Concluída
 **Fase 2 — Quick Input + IA (núcleo)** ✅ Concluída
 **Fase 3 — Metas, Marcos & Tarefas** ✅ Concluída
+**Fase 4 — Rotinas & Reorganização Adaptativa** ✅ Concluída
 
 ## Stack
 
@@ -32,6 +33,7 @@ zenith/
 │   │   │   ├── dashboard/        # Dashboard com QuickInput + gráficos
 │   │   │   ├── settings/         # Configurações + seletor de tema
 │   │   │   ├── metas/            # CRUD de metas + marcos + tarefas
+│   │   │   ├── rotinas/          # CRUD de rotinas + gerar tarefas
 │   │   │   └── relatorio/        # Placeholder
 │   │   ├── components/           # Header, Sidebar, Footer, ShellLayout, QuickInput
 │   │   └── lib/utils.ts          # cn() helper
@@ -54,10 +56,18 @@ zenith/
 │               ├── tasks.module.ts
 │               ├── tasks.controller.ts  # CRUD /tasks + /tasks/:id/toggle
 │               └── tasks.service.ts
+│           ├── routines/         # Módulo Rotinas
+│           │   ├── routines.module.ts
+│           │   ├── routines.controller.ts  # CRUD /routines + /routines/:id/generate-tasks
+│           │   └── routines.service.ts     # Geração de tasks por frequência
+│           └── scheduler/        # Módulo Reorganização Adaptativa
+│               ├── scheduler.module.ts
+│               ├── scheduler.controller.ts  # POST /appointments (cria + reorganiza)
+│               └── scheduler.service.ts     # Heurística de realocação de conflitos
 ├── packages/
 │   └── shared/
 │       └── src/
-│           ├── types/index.ts        # User, Session, AIIntent, ParsedAIResult, AILogEntry, Goal, Milestone, Task, DTOs
+│           ├── types/index.ts        # User, Session, AIIntent, ParsedAIResult, AILogEntry, Goal, Milestone, Task, Routine, Appointment, ReorganizationResult, DTOs
 │           ├── auth/index.ts         # MockAuthProvider
 │           ├── ai/index.ts           # MockAIProvider (parsing determinístico)
 │           ├── theme/tokens.css      # CSS variables (paletas red/violet/green)
@@ -91,7 +101,7 @@ Usa `MockAuthProvider` — sempre sucesso, sem chamadas de rede. Sessão persist
 
 ## IA (Quick Input)
 
-Usa `Google Gemini` (gemini-2.5-flash) como IA real, com `MockAIProvider` como fallback automático. Identifica intents: `LOG_EXPENSE`, `CREATE_EVENT`, `CREATE_GOAL`, `CREATE_TASK`, `UNKNOWN`. Backend expõe `POST /ai/parse` e `GET /ai/log`.
+Usa `Google Gemini` (gemini-2.5-flash) como IA real, com `MockAIProvider` como fallback automático. Identifica intents: `LOG_EXPENSE`, `CREATE_EVENT`, `CREATE_GOAL`, `CREATE_TASK`, `CREATE_ROUTINE`, `CREATE_APPOINTMENT`, `UNKNOWN`. Backend despacha CREATE_GOAL → /goals, CREATE_TASK → /tasks, CREATE_ROUTINE → /routines, CREATE_APPOINTMENT → /appointments (com reorganização) automaticamente. Response inclui `sideEffect` com resultado da persistência.
 
 ## Metas, Marcos & Tarefas
 
@@ -104,6 +114,18 @@ Backend expõe CRUD completo:
 - `PATCH /tasks/:id/toggle` — alternar conclusão de tarefa
 
 Página `/metas` com cards expansíveis, barra de progresso, filtros por status e categoria, criação de metas/marcos/tarefas inline.
+
+## Rotinas & Reorganização Adaptativa
+
+Backend expõe:
+- `POST/GET/PATCH/DELETE /routines` — rotinas recorrentes (daily/weekly/monthly)
+- `POST /routines/:id/generate-tasks?days=7` — gera tarefas para N dias conforme frequência
+- `POST /appointments` — cria compromisso pontual + dispara reorganização automática
+- `GET /appointments` — lista compromissos
+
+**Heurística de reorganização**: quando um compromisso conflita com uma tarefa de rotina (sobreposição de horário), a tarefa é movida para o próximo horário livre no mesmo dia (tenta depois do compromisso, depois antes). Retorna `ReorganizationResult` com a lista de tarefas movidas e mensagem amigável.
+
+Página `/rotinas` com lista de rotinas, toggle ativa/pausada, botão de gerar tarefas. QuickInput mostra toast de reorganização quando um compromisso conflita com rotina existente.
 
 ## Como rodar
 
@@ -124,7 +146,7 @@ cd apps/backend && npm run dev
 - [x] **Fase 1** — UI Shell + telas mock: login, dashboard, settings, navegação
 - [x] **Fase 2** — Quick Input + IA: MockAIProvider, POST /ai/parse, QuickInput no dashboard, Gemini real com fallback
 - [x] **Fase 3** — Metas, Marcos & Tarefas: CRUD completo backend + frontend, progresso visual, filtros
-- [ ] **Fase 4** — Rotinas & Reorganização Adaptativa
+- [x] **Fase 4** — Rotinas & Reorganização Adaptativa: rotinas recorrentes, compromissos, heurística de reorganização de conflitos, toast no QuickInput
 - [ ] **Fase 5** — Calendário & Planejamento
 - [ ] **Fase 6** — Sistema de Blocos (Notion-like)
 - [ ] **Fase 7** — Gastos & Integração Dashboard Financeiro

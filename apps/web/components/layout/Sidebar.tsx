@@ -4,6 +4,7 @@ export function Sidebar() {
   const menuItems = [
     { label: 'Dashboard', href: '/dashboard' },
     { label: 'Metas', href: '/metas' },
+    { label: 'Rotinas', href: '/rotinas' },
     { label: 'Relatório', href: '/relatorio' },
   ];
 

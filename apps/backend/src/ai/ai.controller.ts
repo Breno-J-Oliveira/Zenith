@@ -7,7 +7,7 @@ export class AIController {
   constructor(private readonly aiService: AIService) {}
 
   @Post('parse')
-  async parse(@Body('text') text: string): Promise<ParsedAIResult> {
+  async parse(@Body('text') text: string) {
     return this.aiService.parse(text);
   }
 

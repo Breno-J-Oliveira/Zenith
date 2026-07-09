@@ -5,6 +5,8 @@ import { AppService } from './app.service';
 import { AIModule } from './ai/ai.module';
 import { GoalsModule } from './goals/goals.module';
 import { TasksModule } from './tasks/tasks.module';
+import { RoutinesModule } from './routines/routines.module';
+import { SchedulerModule } from './scheduler/scheduler.module';
 
 @Module({
   imports: [
@@ -12,6 +14,8 @@ import { TasksModule } from './tasks/tasks.module';
     AIModule,
     GoalsModule,
     TasksModule,
+    RoutinesModule,
+    SchedulerModule,
   ],
   controllers: [AppController],
   providers: [AppService],
