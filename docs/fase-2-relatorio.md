@@ -34,7 +34,9 @@
 ## Decisões
 
 - **Parsing determinístico**: Sem OpenAI key disponível ainda. O parser usa regex e keywords para identificar intent e extrair dados. Comentário TODO marca onde a integração real entra no futuro.
-- **Import no backend**: Backend usa `commonjs` sem path mapping para `@zenith/shared`. Import via caminho relativo `../../../../packages/shared/src` para evitar configurar tsconfig paths no NestJS.
+- **Confidence fixo por intent**: Os valores de confidence são hardcoded por intent (LOG_EXPENSE=0.9, CREATE_EVENT=0.85, CREATE_GOAL=0.8, CREATE_TASK=0.75, UNKNOWN=0.3). Não são calculados dinamicamente — é uma simplificação do mock. Quando a OpenAI for integrada, o confidence virá do próprio modelo.
+- **Import no backend via rootDir expandido**: O backend precisa importar tipos e lógica de `packages/shared/src/`. Em vez de configurar `paths` no tsconfig (que o NestJS CLI não resolve nativamente sem `tsconfig-paths`), expandimos `rootDir` para `../../` e incluímos os arquivos relevantes do shared no `include`. Isso faz o `dist/` preservar a estrutura de pastas (`dist/apps/backend/src/main.js`), exigindo `entryFile: "apps/backend/src/main"` no `nest-cli.json`. Alternativa mais limpa: configurar `paths` + instalar `tsconfig-paths` como devDependency, ou separar `packages/shared` em `shared/core` (sem JSX) e `shared/ui` (com Logo.tsx), evitando que o backend precise ignorar o `index.ts`.
+- **Import direto em ai/ e types/ (ignorando index.ts)**: O `index.ts` do shared exporta `Logo.tsx` que usa JSX. O backend (commonjs, sem `--jsx`) quebra ao compilar o `index.ts`. Solução temporária: importar diretamente de `packages/shared/src/ai` e `packages/shared/src/types`, ignorando o barrel export. Isso é dívida técnica — ver Pendências.
 - **Log em memória**: AILog mantido como array no AIService. Sem Prisma/Postgres — vem em fase futura.
 - **QuickInput no dashboard**: Posicionado no topo do conteúdo, acima do avatar. Não é FAB flutuante ainda — pode ser ajustado quando o design mobile for definido.
 - **Sem TanStack Query**: Fetch simples com try/catch. TanStack Query vem quando houver mais endpoints e necessidade de cache.
@@ -44,14 +46,22 @@
 - [x] Quick Input envia texto para o backend e recebe resultado estruturado
   - **Status**: OK — POST /ai/parse retorna ParsedAIResult com intent, confidence, payload
 
+- [x] Backend Fase 0/1 continua funcionando
+  - **Status**: OK — GET /health retorna 200 com {"status":"ok","timestamp":"...","service":"zenith-backend"}
+
 - [x] Parsing mock identifica corretamente gastos, eventos, metas e tarefas
-  - **Status**: OK — Testado com "gastei 25 no pastel" (LOG_EXPENSE), "reunião dia 23 às 14h" (CREATE_EVENT), "tenho que entregar o TCC" (CREATE_GOAL), "lembrar de pagar a conta" (CREATE_TASK)
+  - **Status**: OK — Testado todos os intents:
+    - `"gastei 25 no pastel"` → LOG_EXPENSE, confidence 0.9, amount 25, category "alimentação"
+    - `"reuniao dia 23 as 14h"` → CREATE_EVENT, confidence 0.85, date "2026-07-23", time "14:00"
+    - `"tenho que entregar o TCC"` → CREATE_GOAL, confidence 0.8, category "pessoal"
+    - `"lembrar de pagar a conta"` → CREATE_TASK, confidence 0.75
+    - `"oi"` → UNKNOWN, confidence 0.3, payload null
 
 - [x] Feedback visual no dashboard mostra o que a IA entendeu
   - **Status**: OK — Lista de ações com intent badge + summary legível
 
 - [x] AILog mantém histórico das ações (em memória)
-  - **Status**: OK — GET /ai/log retorna array de AILogEntry
+  - **Status**: OK — GET /ai/log retorna array de 3 AILogEntry após 3 chamadas POST /ai/parse, com id, timestamp, input e result corretos
 
 ## Pendências
 
@@ -59,4 +69,5 @@
 - **Persistência**: AILog em memória — perde dados ao reiniciar backend. Prisma + Postgres vem em fase futura.
 - **Quick Input visual**: Posicionado como card no dashboard. Pode evoluir para FAB flutuante quando o design mobile for definido.
 - **Tratamento de erros**: Fetch simples sem retry. Considerar TanStack Query quando houver mais endpoints.
-- **Backend path mapping**: Import relativo funciona mas é frágil. Considerar configurar tsconfig paths ou publicar @zenith/shared como package compilado no futuro.
+- **Dívida técnica — import direto ignorando index.ts**: O backend importa de `packages/shared/src/ai` e `packages/shared/src/types` diretamente, ignorando o `index.ts` que exporta `Logo.tsx` (JSX incompatível com commonjs). Solução definitiva: separar `packages/shared` em dois sub-packages — `shared/core` (tipos, auth, ai — sem JSX, importável pelo backend) e `shared/ui` (Logo.tsx, componentes React — importável apenas pelo web). Isso elimina a necessidade de rootDir expandido e entryFile customizado no nest-cli.json.
+- **rootDir expandido no backend**: `rootDir: "../../"` + `entryFile` customizado são workaround para o import do shared. Se o shared for separado em core/ui, o backend volta a `rootDir: "src"` e `entryFile` default.
