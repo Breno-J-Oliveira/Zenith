@@ -1,0 +1,131 @@
+:root {
+  /* Paleta primária (tema padrão "red") */
+  --color-primary: #FF2B51;
+  --color-primary-alt: #F5002C;
+  --color-primary-light: #FF5C79;
+
+  /* Paleta alternativa "violet" */
+  --color-violet: #6C4CFF;
+  --color-violet-dark: #3B28B3;
+  --color-violet-light: #987BFF;
+
+  /* Paleta alternativa "green" */
+  --color-green: #00CC44;
+  --color-green-dark: #005F22;
+
+  /* Superfícies escuras */
+  --color-bg: #030303;
+  --color-surface-1: #0B0B0D;
+  --color-surface-2: #282C33;
+  --color-surface-3: #011928;
+
+  /* Semânticas */
+  --color-success: #2FC63E;
+  --color-danger: #D11D00;
+
+  /* Texto */
+  --color-text: #FFFFFF;
+  --color-text-dim: #8899AA;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-orbitron: var(--font-orbitron);
+  --font-space-mono: var(--font-space-mono);
+  --font-rajdhani: var(--font-rajdhani);
+  --font-sans: var(--font-rajdhani);
+}
+
+body {
+  font-family: var(--font-rajdhani), sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+/* Theme-specific overrides */
+[data-theme="violet"] {
+  --color-primary: var(--color-violet);
+  --color-primary-alt: var(--color-violet-dark);
+  --color-primary-light: var(--color-violet-light);
+}
+
+[data-theme="green"] {
+  --color-primary: var(--color-green);
+  --color-primary-alt: var(--color-green-dark);
+  --color-primary-light: #00E64D;
+}
+
+/* Utility classes */
+.text-primary {
+  color: var(--color-primary);
+}
+
+.bg-primary {
+  background-color: var(--color-primary);
+}
+
+.bg-surface-1 {
+  background-color: var(--color-surface-1);
+}
+
+.bg-surface-2 {
+  background-color: var(--color-surface-2);
+}
+
+.bg-surface-3 {
+  background-color: var(--color-surface-3);
+}
+
+.text-dim {
+  color: var(--color-text-dim);
+}
+
+.font-orbitron {
+  font-family: var(--font-orbitron), sans-serif;
+}
+
+.font-mono {
+  font-family: var(--font-space-mono), monospace;
+}
+
+@layer base {
+  :root {
+    --background: var(--color-bg);
+    --foreground: var(--color-text);
+    --card: var(--color-surface-1);
+    --card-foreground: var(--color-text);
+    --popover: var(--color-surface-1);
+    --popover-foreground: var(--color-text);
+    --primary: var(--color-primary);
+    --primary-foreground: var(--color-text);
+    --secondary: var(--color-surface-2);
+    --secondary-foreground: var(--color-text);
+    --muted: var(--color-surface-2);
+    --muted-foreground: var(--color-text-dim);
+    --accent: var(--color-surface-2);
+    --accent-foreground: var(--color-text);
+    --destructive: var(--color-danger);
+    --border: var(--color-surface-2);
+    --input: var(--color-surface-2);
+    --ring: var(--color-primary);
+    --radius: 0.625rem;
+    --sidebar: var(--color-surface-1);
+    --sidebar-foreground: var(--color-text);
+    --sidebar-primary: var(--color-primary);
+    --sidebar-primary-foreground: var(--color-text);
+    --sidebar-accent: var(--color-surface-2);
+    --sidebar-accent-foreground: var(--color-text);
+    --sidebar-border: var(--color-surface-2);
+    --sidebar-ring: var(--color-primary);
+  }
+  * {
+    border-color: var(--color-surface-2);
+    outline-color: var(--color-primary);
+  }
+  html {
+    font-family: var(--font-rajdhani), sans-serif;
+  }
+}

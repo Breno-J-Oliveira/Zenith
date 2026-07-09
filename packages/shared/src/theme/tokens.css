@@ -1,0 +1,29 @@
+:root {
+  /* Paleta primária (tema padrão "red") */
+  --color-primary: #FF2B51;
+  --color-primary-alt: #F5002C;
+  --color-primary-light: #FF5C79;
+
+  /* Paleta alternativa "violet" (para o seletor de tema) */
+  --color-violet: #6C4CFF;
+  --color-violet-dark: #3B28B3;
+  --color-violet-light: #987BFF;
+
+  /* Paleta alternativa "green" */
+  --color-green: #00CC44;
+  --color-green-dark: #005F22;
+
+  /* Superfícies escuras (background é quase preto nos prints, não use cinza claro) */
+  --color-bg: #030303;
+  --color-surface-1: #0B0B0D;
+  --color-surface-2: #282C33;
+  --color-surface-3: #011928;
+
+  /* Semânticas */
+  --color-success: #2FC63E;
+  --color-danger: #D11D00;
+
+  /* Texto */
+  --color-text: #FFFFFF;
+  --color-text-dim: #8899AA;
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Zenith — Breno J. Oliveira</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root{--black:#000;--c1:#00ffff;--c3:#ffdd00;--dim:#8899aa;
+      --fd:'Orbitron',monospace;--fm:'Space Mono',monospace;--fb:'Rajdhani',sans-serif;}
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{background:radial-gradient(ellipse at 50% 0%,#050b14,#000);color:#fff;font-family:var(--fb);min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:40px;overflow:hidden;}
+    .box{max-width:560px;position:relative;z-index:2;}
+    .tag{font-family:var(--fm);font-size:.6rem;letter-spacing:.4em;color:var(--c1);text-transform:uppercase;margin-bottom:24px;}
+    h1{font-family:var(--fd);font-size:clamp(1.8rem,5vw,3rem);font-weight:900;line-height:1.05;margin-bottom:20px;}
+    p{font-size:1.05rem;line-height:1.7;color:var(--dim);margin-bottom:36px;}
+    .badge{display:inline-block;font-family:var(--fm);font-size:.55rem;letter-spacing:.3em;color:var(--c3);border:1px solid rgba(255,221,0,.3);padding:8px 16px;text-transform:uppercase;margin-bottom:36px;}
+    .back{display:inline-flex;align-items:center;gap:10px;font-family:var(--fm);font-size:.65rem;letter-spacing:.2em;color:#000;background:#fff;text-decoration:none;padding:14px 28px;text-transform:uppercase;transition:.3s;}
+    .back:hover{background:var(--c1);}
+    .grid{position:fixed;inset:0;z-index:1;background-image:linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:40px 40px;}
+  </style>
+</head>
+<body>
+  <div class="grid"></div>
+  <div class="box">
+    <div class="tag">Projeto do Portfólio</div>
+    <h1>ZENITH</h1>
+    <div class="badge">🚧 Em desenvolvimento</div>
+    <p>Interface com UI/UX avançada, animações fluidas e dashboard rico em microinterações.<br/>
+       Em breve disponível aqui em <code>projetos/zenith/</code>.</p>
+    <a class="back" href="../../projects.html">← VOLTAR AO PORTFÓLIO</a>
+  </div>
+</body>
+</html>
