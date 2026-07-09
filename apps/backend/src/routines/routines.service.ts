@@ -76,6 +76,11 @@ export class RoutinesService {
       }
 
       if (shouldGenerate) {
+        const alreadyExists = this.generatedTasks.some(
+          t => (t as any).routineId === routine.id && t.date === dateStr
+        );
+        if (alreadyExists) continue;
+
         const task: Task = {
           id: `task-${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${i}`,
           title: routine.title,

@@ -67,7 +67,7 @@ export class SchedulerService {
       const hasConflict = taskStart < apptEnd && taskEnd > apptStart;
       if (!hasConflict) continue;
 
-      const newSlot = this.findFreeSlot(appointment, dayTasks, taskDuration || 60);
+      const newSlot = this.findFreeSlot(appointment, dayTasks, taskDuration || 60, task.id);
       if (!newSlot) continue;
 
       this.routinesService.updateGeneratedTask(task.id, {
@@ -99,16 +99,19 @@ export class SchedulerService {
     appointment: Appointment,
     dayTasks: Task[],
     duration: number,
+    excludeTaskId: string,
   ): { time: string } | null {
     const apptEnd = this.toMinutes(appointment.endTime);
     const apptStart = this.toMinutes(appointment.startTime);
 
     const busy: Array<{ start: number; end: number }> = [
       { start: apptStart, end: apptEnd },
-      ...dayTasks.map(t => {
-        const s = this.toMinutes((t as any).time || '00:00');
-        return { start: s, end: s + ((t as any).duration || 60) };
-      }),
+      ...dayTasks
+        .filter(t => t.id !== excludeTaskId)
+        .map(t => {
+          const s = this.toMinutes((t as any).time || '00:00');
+          return { start: s, end: s + ((t as any).duration || 60) };
+        }),
       ...this.appointments
         .filter(a => a.date === appointment.date && a.id !== appointment.id)
         .map(a => ({ start: this.toMinutes(a.startTime), end: this.toMinutes(a.endTime) })),
@@ -118,7 +121,7 @@ export class SchedulerService {
     let candidateStart = apptEnd;
     let candidateEnd = candidateStart + duration;
     if (candidateEnd <= this.toMinutes('23:59')) {
-      if (!this.overlapsAny(candidateStart, candidateEnd, busy, appointment.id)) {
+      if (!this.overlapsAny(candidateStart, candidateEnd, busy)) {
         return { time: this.fromMinutes(candidateStart) };
       }
     }
@@ -127,7 +130,7 @@ export class SchedulerService {
     candidateEnd = apptStart;
     candidateStart = candidateEnd - duration;
     if (candidateStart >= this.toMinutes('00:00')) {
-      if (!this.overlapsAny(candidateStart, candidateEnd, busy, appointment.id)) {
+      if (!this.overlapsAny(candidateStart, candidateEnd, busy)) {
         return { time: this.fromMinutes(candidateStart) };
       }
     }
@@ -135,7 +138,7 @@ export class SchedulerService {
     return null;
   }
 
-  private overlapsAny(start: number, end: number, busy: Array<{ start: number; end: number }>, excludeApptId: string): boolean {
+  private overlapsAny(start: number, end: number, busy: Array<{ start: number; end: number }>): boolean {
     return busy.some(b => start < b.end && end > b.start);
   }
 
