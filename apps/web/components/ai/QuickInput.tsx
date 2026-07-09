@@ -7,7 +7,10 @@ interface QuickInputAction {
   text: string;
   intent: string;
   summary: string;
+  persisted?: boolean;
 }
+
+const API = 'http://localhost:3002';
 
 function summarizeResult(intent: string, payload: any): string {
   switch (intent) {
@@ -24,6 +27,25 @@ function summarizeResult(intent: string, payload: any): string {
   }
 }
 
+async function persistResult(intent: string, payload: any): Promise<boolean> {
+  try {
+    if (intent === 'CREATE_GOAL' && payload?.title) {
+      const body: any = { title: payload.title };
+      if (payload.category) body.category = payload.category;
+      if (payload.deadline) body.deadline = payload.deadline;
+      await fetch(`${API}/goals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return true;
+    }
+    if (intent === 'CREATE_TASK' && payload?.title) {
+      const body: any = { title: payload.title };
+      if (payload.date) body.date = payload.date;
+      await fetch(`${API}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      return true;
+    }
+  } catch { /* ignore */ }
+  return false;
+}
+
 export function QuickInput() {
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,18 +57,20 @@ export function QuickInput() {
 
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3002/ai/parse', {
+      const res = await fetch(`${API}/ai/parse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
       const data = await res.json();
       const summary = summarizeResult(data.intent, data.payload);
+      const persisted = await persistResult(data.intent, data.payload);
       const action: QuickInputAction = {
         id: `action-${Date.now()}`,
         text,
         intent: data.intent,
-        summary,
+        summary: persisted ? `${summary} ✓` : summary,
+        persisted,
       };
       setActions(prev => [action, ...prev].slice(0, 5));
       setText('');

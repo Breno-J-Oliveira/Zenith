@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ShellLayout } from '../../components/ShellLayout';
+import { ShellLayout } from '../../components/layout/ShellLayout';
 
 export default function SettingsPage() {
   const [theme, setTheme] = useState('red');

@@ -1,4 +1,4 @@
-import { ShellLayout } from '../../components/ShellLayout';
+import { ShellLayout } from '../../components/layout/ShellLayout';
 
 export default function RelatorioPage() {
   return (

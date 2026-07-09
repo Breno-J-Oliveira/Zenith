@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ShellLayout } from '../../components/ShellLayout';
-import { QuickInput } from '../../components/QuickInput';
+import { ShellLayout } from '../../components/layout/ShellLayout';
+import { QuickInput } from '../../components/ai/QuickInput';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
 
 const weeklyData = [
