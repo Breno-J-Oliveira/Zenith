@@ -8,6 +8,23 @@ const MOCK_USER_ID = 'mock-user-id';
 export class DatabasesService {
   constructor(private prisma: PrismaService) {}
 
+  // Garante que o usuário mock existe no banco
+  private async ensureMockUser() {
+    const user = await this.prisma.user.findUnique({
+      where: { id: MOCK_USER_ID },
+    });
+    if (!user) {
+      await this.prisma.user.create({
+        data: {
+          id: MOCK_USER_ID,
+          email: 'mock-user@zenith.app',
+          name: 'Mock User',
+        },
+      });
+    }
+    return MOCK_USER_ID;
+  }
+
   // ─── DATABASE ──────────────────────────────────────────────
 
   async findAll(pageId?: string) {
@@ -46,6 +63,7 @@ export class DatabasesService {
     isPreset?: boolean;
     presetType?: string;
   }) {
+    await this.ensureMockUser();
     return this.prisma.database.create({
       data: {
         ...data,
@@ -240,6 +258,8 @@ export class DatabasesService {
 
     const preset = presets[presetType];
     if (!preset) throw new NotFoundException('Preset não encontrado');
+
+    await this.ensureMockUser();
 
     // Cria o database com propriedades
     const database = await this.prisma.database.create({
