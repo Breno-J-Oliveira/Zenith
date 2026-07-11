@@ -56,12 +56,6 @@ const statusLabels: Record<string, string> = {
   CANCELLED: 'Cancelada',
 };
 
-const priorityColors: Record<string, string> = {
-  alta: 'var(--color-primary)',
-  media: 'var(--color-text-dim)',
-  baixa: 'var(--color-surface-2)',
-};
-
 function calcProgress(goal: Goal): number {
   const items = [...goal.milestones, ...goal.tasks];
   if (items.length === 0) return 0;
@@ -174,78 +168,105 @@ export default function MetasPage() {
     } catch { /* ignore */ }
   };
 
+  const activeGoals = goals.filter(g => g.status === 'ACTIVE').length;
+  const completedGoals = goals.filter(g => g.status === 'COMPLETED').length;
+
   return (
     <ShellLayout>
-      <div className="p-8 max-w-5xl">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="font-orbitron text-2xl font-bold">Metas</h1>
+      <div className="max-w-5xl mx-auto animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[var(--color-primary-subtle)] text-[var(--color-primary)]">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="6" />
+                <circle cx="12" cy="12" r="2" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="font-orbitron text-2xl font-bold text-[var(--color-text)]">Metas</h1>
+              <p className="text-[var(--color-text-dim)] text-sm">{activeGoals} ativas · {completedGoals} concluídas</p>
+            </div>
+          </div>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="bg-primary text-white font-orbitron font-bold px-4 py-2 rounded hover:opacity-90 transition-opacity text-sm"
+            className="btn btn-primary"
           >
-            {showCreateForm ? 'Cancelar' : '+ Nova Meta'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            {showCreateForm ? 'Cancelar' : 'Nova Meta'}
           </button>
         </div>
 
+        {/* Create Form */}
         {showCreateForm && (
-          <form onSubmit={handleCreateGoal} className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-lg p-6 mb-6 space-y-4">
-            <div>
-              <label className="font-mono text-xs text-dim block mb-1">TÍTULO</label>
-              <input
-                type="text"
-                value={newGoal.title}
-                onChange={e => setNewGoal(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Ex: Entregar TCC"
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white placeholder:text-dim focus:outline-none focus:border-[var(--color-primary)]"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="font-mono text-xs text-dim block mb-1">DESCRIÇÃO (opcional)</label>
-              <input
-                type="text"
-                value={newGoal.description}
-                onChange={e => setNewGoal(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Ex: Escrever e defender o trabalho de conclusão"
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white placeholder:text-dim focus:outline-none focus:border-[var(--color-primary)]"
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
+          <form onSubmit={handleCreateGoal} className="card p-6 mb-6 hud-border animate-slide-in-up">
+            <h3 className="font-orbitron text-sm font-bold text-[var(--color-primary)] mb-4 tracking-wider">NOVA META</h3>
+            <div className="space-y-4">
               <div>
-                <label className="font-mono text-xs text-dim block mb-1">CATEGORIA</label>
-                <select
-                  value={newGoal.category}
-                  onChange={e => setNewGoal(prev => ({ ...prev, category: e.target.value }))}
-                  className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]"
-                >
-                  {Object.entries(categoryLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="font-mono text-xs text-dim block mb-1">PRIORIDADE</label>
-                <select
-                  value={newGoal.priority}
-                  onChange={e => setNewGoal(prev => ({ ...prev, priority: e.target.value }))}
-                  className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]"
-                >
-                  <option value="alta">Alta</option>
-                  <option value="media">Média</option>
-                  <option value="baixa">Baixa</option>
-                </select>
-              </div>
-              <div>
-                <label className="font-mono text-xs text-dim block mb-1">DEADLINE (opcional)</label>
+                <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">TÍTULO</label>
                 <input
-                  type="date"
-                  value={newGoal.deadline}
-                  onChange={e => setNewGoal(prev => ({ ...prev, deadline: e.target.value }))}
-                  className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]"
+                  type="text"
+                  value={newGoal.title}
+                  onChange={e => setNewGoal(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Ex: Entregar TCC"
+                  className="input w-full"
+                  autoFocus
                 />
               </div>
+              <div>
+                <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">DESCRIÇÃO (opcional)</label>
+                <input
+                  type="text"
+                  value={newGoal.description}
+                  onChange={e => setNewGoal(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Ex: Escrever e defender o trabalho de conclusão"
+                  className="input w-full"
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">CATEGORIA</label>
+                  <select
+                    value={newGoal.category}
+                    onChange={e => setNewGoal(prev => ({ ...prev, category: e.target.value }))}
+                    className="input w-full"
+                  >
+                    {Object.entries(categoryLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">PRIORIDADE</label>
+                  <select
+                    value={newGoal.priority}
+                    onChange={e => setNewGoal(prev => ({ ...prev, priority: e.target.value }))}
+                    className="input w-full"
+                  >
+                    <option value="alta">Alta</option>
+                    <option value="media">Média</option>
+                    <option value="baixa">Baixa</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">DEADLINE (opcional)</label>
+                  <input
+                    type="date"
+                    value={newGoal.deadline}
+                    onChange={e => setNewGoal(prev => ({ ...prev, deadline: e.target.value }))}
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Criar Meta
+              </button>
             </div>
-            <button type="submit" className="bg-primary text-white font-orbitron font-bold px-6 py-2 rounded hover:opacity-90 transition-opacity">
-              Criar Meta
-            </button>
           </form>
         )}
 
@@ -254,7 +275,7 @@ export default function MetasPage() {
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
-            className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[var(--color-primary)]"
+            className="input text-sm"
           >
             <option value="">Todos status</option>
             <option value="ACTIVE">Ativa</option>
@@ -265,7 +286,7 @@ export default function MetasPage() {
           <select
             value={filterCategory}
             onChange={e => setFilterCategory(e.target.value)}
-            className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-[var(--color-primary)]"
+            className="input text-sm"
           >
             <option value="">Todas categorias</option>
             {Object.entries(categoryLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -274,11 +295,21 @@ export default function MetasPage() {
 
         {/* Goals list */}
         {loading ? (
-          <div className="text-dim text-center py-12">Carregando...</div>
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="w-12 h-12 rounded-full border-2 border-[var(--color-surface-2)] border-t-[var(--color-primary)] animate-spin mb-4" />
+            <p className="text-[var(--color-text-dim)] text-sm">Carregando metas...</p>
+          </div>
         ) : goals.length === 0 ? (
-          <div className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-lg p-12 text-center">
-            <p className="font-orbitron text-xl text-dim mb-2">Nenhuma meta</p>
-            <p className="text-dim text-sm">Clique em "+ Nova Meta" para começar.</p>
+          <div className="card p-12 text-center hud-border">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-surface-2)] flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10" />
+                <circle cx="12" cy="12" r="6" />
+                <circle cx="12" cy="12" r="2" />
+              </svg>
+            </div>
+            <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">Nenhuma meta</p>
+            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em "Nova Meta" para começar.</p>
           </div>
         ) : (
           <div className="space-y-4">

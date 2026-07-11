@@ -22,6 +22,33 @@ const frequencyLabels: Record<string, string> = {
   monthly: 'Mensal',
 };
 
+const frequencyIcons: Record<string, React.ReactNode> = {
+  daily: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  ),
+  weekly: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  ),
+  monthly: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+      <line x1="10" y1="14" x2="14" y2="14" />
+      <line x1="12" y1="12" x2="12" y2="16" />
+    </svg>
+  ),
+};
+
 export default function RotinasPage() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -91,132 +118,223 @@ export default function RotinasPage() {
     } catch { /* ignore */ }
   };
 
+  const activeRoutines = routines.filter(r => r.active).length;
+  const totalMinutes = routines.filter(r => r.active).reduce((acc, r) => acc + r.duration, 0);
+
   return (
     <ShellLayout>
-      <div className="p-8 max-w-5xl">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="font-orbitron text-2xl font-bold">Rotinas</h1>
+      <div className="max-w-5xl mx-auto animate-fade-in">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[var(--color-success-glow)] text-[var(--color-success)]">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="font-orbitron text-2xl font-bold text-[var(--color-text)]">Rotinas</h1>
+              <p className="text-[var(--color-text-dim)] text-sm">{activeRoutines} ativas · {totalMinutes}min/dia</p>
+            </div>
+          </div>
           <button
             onClick={() => setShowCreateForm(!showCreateForm)}
-            className="bg-primary text-white font-orbitron font-bold px-4 py-2 rounded hover:opacity-90 transition-opacity text-sm"
+            className="btn btn-primary"
           >
-            {showCreateForm ? 'Cancelar' : '+ Nova Rotina'}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            {showCreateForm ? 'Cancelar' : 'Nova Rotina'}
           </button>
         </div>
 
+        {/* Create Form */}
         {showCreateForm && (
-          <form onSubmit={handleCreate} className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-lg p-6 mb-6 space-y-4">
-            <div>
-              <label className="font-mono text-xs text-dim block mb-1">TÍTULO</label>
-              <input
-                type="text"
-                value={newRoutine.title}
-                onChange={e => setNewRoutine(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Ex: Estudar React"
-                className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white placeholder:text-dim focus:outline-none focus:border-[var(--color-primary)]"
-                autoFocus
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-4">
+          <form onSubmit={handleCreate} className="card p-6 mb-6 hud-border animate-slide-in-up">
+            <h3 className="font-orbitron text-sm font-bold text-[var(--color-success)] mb-4 tracking-wider">NOVA ROTINA</h3>
+            <div className="space-y-4">
               <div>
-                <label className="font-mono text-xs text-dim block mb-1">FREQUÊNCIA</label>
-                <select
-                  value={newRoutine.frequency}
-                  onChange={e => setNewRoutine(prev => ({ ...prev, frequency: e.target.value }))}
-                  className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]"
-                >
-                  <option value="daily">Diária</option>
-                  <option value="weekly">Semanal</option>
-                  <option value="monthly">Mensal</option>
-                </select>
-              </div>
-              <div>
-                <label className="font-mono text-xs text-dim block mb-1">HORÁRIO</label>
+                <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">TÍTULO</label>
                 <input
-                  type="time"
-                  value={newRoutine.time}
-                  onChange={e => setNewRoutine(prev => ({ ...prev, time: e.target.value }))}
-                  className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]"
+                  type="text"
+                  value={newRoutine.title}
+                  onChange={e => setNewRoutine(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Ex: Estudar React"
+                  className="input w-full"
+                  autoFocus
                 />
               </div>
-              <div>
-                <label className="font-mono text-xs text-dim block mb-1">DURAÇÃO (min)</label>
-                <input
-                  type="number"
-                  value={newRoutine.duration}
-                  onChange={e => setNewRoutine(prev => ({ ...prev, duration: e.target.value }))}
-                  min="5"
-                  step="5"
-                  className="w-full bg-[var(--color-bg)] border border-[var(--color-surface-2)] rounded px-4 py-2 text-white focus:outline-none focus:border-[var(--color-primary)]"
-                />
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">FREQUÊNCIA</label>
+                  <select
+                    value={newRoutine.frequency}
+                    onChange={e => setNewRoutine(prev => ({ ...prev, frequency: e.target.value }))}
+                    className="input w-full"
+                  >
+                    <option value="daily">Diária</option>
+                    <option value="weekly">Semanal</option>
+                    <option value="monthly">Mensal</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">HORÁRIO</label>
+                  <input
+                    type="time"
+                    value={newRoutine.time}
+                    onChange={e => setNewRoutine(prev => ({ ...prev, time: e.target.value }))}
+                    className="input w-full"
+                  />
+                </div>
+                <div>
+                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">DURAÇÃO (min)</label>
+                  <input
+                    type="number"
+                    value={newRoutine.duration}
+                    onChange={e => setNewRoutine(prev => ({ ...prev, duration: e.target.value }))}
+                    min="5"
+                    step="5"
+                    className="input w-full"
+                  />
+                </div>
               </div>
+              <button type="submit" className="btn btn-primary">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Criar Rotina
+              </button>
             </div>
-            <button type="submit" className="bg-primary text-white font-orbitron font-bold px-6 py-2 rounded hover:opacity-90 transition-opacity">
-              Criar Rotina
-            </button>
           </form>
         )}
 
+        {/* Success Message */}
         {generatedInfo && (
-          <div className="bg-primary/10 border border-[var(--color-primary)] rounded-lg p-3 mb-4 font-mono text-sm text-primary">
-            {generatedInfo}
+          <div className="card p-4 mb-6 border-[var(--color-success)]/50 bg-[rgba(47,198,62,0.05)] animate-slide-in-up">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 rounded-lg bg-[var(--color-success)]/20 text-[var(--color-success)]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+              <p className="text-sm text-[var(--color-success)] font-medium">{generatedInfo}</p>
+            </div>
           </div>
         )}
 
+        {/* Content */}
         {loading ? (
-          <div className="text-dim text-center py-12">Carregando...</div>
+          <div className="flex flex-col items-center justify-center py-16">
+            <div className="w-12 h-12 rounded-full border-2 border-[var(--color-surface-2)] border-t-[var(--color-success)] animate-spin mb-4" />
+            <p className="text-[var(--color-text-dim)] text-sm">Carregando rotinas...</p>
+          </div>
         ) : routines.length === 0 ? (
-          <div className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-lg p-12 text-center">
-            <p className="font-orbitron text-xl text-dim mb-2">Nenhuma rotina</p>
-            <p className="text-dim text-sm">Clique em "+ Nova Rotina" para começar.</p>
+          <div className="card p-12 text-center hud-border">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-surface-2)] flex items-center justify-center">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5">
+                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                <polyline points="22 4 12 14.01 9 11.01" />
+              </svg>
+            </div>
+            <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">Nenhuma rotina</p>
+            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em "Nova Rotina" para criar um hábito.</p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {routines.map(routine => (
-              <div key={routine.id} className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-lg p-5">
-                <div className="flex items-start justify-between gap-4 mb-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span
-                        className={`inline-block w-2 h-2 rounded-full shrink-0 ${routine.active ? 'bg-primary' : 'bg-[var(--color-surface-2)]'}`}
-                      />
-                      <h3 className="font-orbitron text-lg font-bold truncate">{routine.title}</h3>
+          <div className="space-y-3">
+            {routines.map((routine, index) => (
+              <div
+                key={routine.id}
+                className={`
+                  card p-5 group transition-all duration-200
+                  ${routine.active ? '' : 'opacity-60'}
+                  hover:border-[var(--border-strong)]
+                `}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {/* Status indicator */}
+                    <div className={`
+                      w-3 h-3 rounded-full shrink-0 transition-all
+                      ${routine.active
+                        ? 'bg-[var(--color-success)] shadow-[0_0_8px_var(--color-success-glow)]'
+                        : 'bg-[var(--color-surface-3)]'
+                      }
+                    `} />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-orbitron text-lg font-bold text-[var(--color-text)] truncate">
+                        {routine.title}
+                      </h3>
                     </div>
                   </div>
+
+                  {/* Badges */}
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono text-xs px-2 py-1 rounded border border-[var(--color-surface-2)] text-dim">
+                    <span className="badge badge-primary">
+                      {frequencyIcons[routine.frequency]}
                       {frequencyLabels[routine.frequency]}
                     </span>
-                    <span className="font-mono text-xs px-2 py-1 rounded border border-[var(--color-surface-2)] text-dim">
+                    <span className="font-mono text-xs px-2 py-1 rounded-md bg-[var(--color-surface-2)] text-[var(--color-text-dim)]">
                       {routine.time}
                     </span>
-                    <span className="font-mono text-xs px-2 py-1 rounded border border-[var(--color-surface-2)] text-dim">
+                    <span className="font-mono text-xs px-2 py-1 rounded-md bg-[var(--color-surface-2)] text-[var(--color-text-dim)]">
                       {routine.duration}min
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                {/* Actions */}
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleToggle(routine.id, routine.active)}
-                    className={`font-mono text-xs px-3 py-1.5 rounded border transition-colors ${
-                      routine.active
-                        ? 'border-[var(--color-primary)] text-primary'
-                        : 'border-[var(--color-surface-2)] text-dim hover:text-white'
-                    }`}
+                    className={`
+                      btn text-xs py-1.5 px-3
+                      ${routine.active
+                        ? 'btn-secondary border-[var(--color-success)]/50 text-[var(--color-success)]'
+                        : 'btn-secondary text-[var(--color-text-dim)]'
+                      }
+                    `}
                   >
-                    {routine.active ? 'ATIVA' : 'PAUSADA'}
+                    {routine.active ? (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                          <polyline points="22 4 12 14.01 9 11.01" />
+                        </svg>
+                        ATIVA
+                      </>
+                    ) : (
+                      <>
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="10" y1="15" x2="10" y2="9" />
+                          <line x1="14" y1="15" x2="14" y2="9" />
+                        </svg>
+                        PAUSADA
+                      </>
+                    )}
                   </button>
+
                   <button
                     onClick={() => handleGenerateTasks(routine.id)}
-                    className="font-mono text-xs px-3 py-1.5 rounded border border-[var(--color-surface-2)] text-dim hover:text-primary hover:border-[var(--color-primary)] transition-colors"
+                    className="btn btn-secondary text-xs py-1.5 px-3"
                   >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg>
                     Gerar 7 dias
                   </button>
+
                   <button
                     onClick={() => handleDelete(routine.id)}
-                    className="ml-auto font-mono text-xs px-3 py-1.5 rounded border border-[var(--color-surface-2)] text-dim hover:text-red-400 hover:border-red-400 transition-colors"
+                    className="ml-auto btn btn-ghost text-xs py-1.5 px-3 text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
                   >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                    </svg>
                     Excluir
                   </button>
                 </div>

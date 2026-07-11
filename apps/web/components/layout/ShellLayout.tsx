@@ -1,16 +1,16 @@
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
-import { Footer } from './Footer';
 
 export function ShellLayout({ children }: { children: React.ReactNode }) {
   return (
-    <>
+    <div className="min-h-screen bg-[var(--color-bg)]">
       <Header />
       <Sidebar />
-      <Footer />
-      <main className="pt-16 pb-12 pr-16 min-h-screen">
-        {children}
+      <main className="pt-16 pl-[72px] min-h-screen">
+        <div className="p-6">
+          {children}
+        </div>
       </main>
-    </>
+    </div>
   );
 }
