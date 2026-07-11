@@ -6,6 +6,7 @@ const orbitron = Orbitron({
   subsets: ['latin'],
   variable: '--font-orbitron',
   display: 'swap',
+  fallback: ['system-ui', 'sans-serif'],
 })
 
 const spaceMono = Space_Mono({ 
@@ -13,6 +14,7 @@ const spaceMono = Space_Mono({
   weight: ['400', '700'],
   variable: '--font-space-mono',
   display: 'swap',
+  fallback: ['ui-monospace', 'SFMono-Regular', 'monospace'],
 })
 
 const rajdhani = Rajdhani({ 
@@ -20,6 +22,7 @@ const rajdhani = Rajdhani({
   weight: ['300', '400', '500', '600', '700'],
   variable: '--font-rajdhani',
   display: 'swap',
+  fallback: ['system-ui', 'sans-serif'],
 })
 
 export const metadata: Metadata = {
