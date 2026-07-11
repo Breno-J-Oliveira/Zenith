@@ -24,6 +24,7 @@ export default function HojePage() {
   const [items, setItems] = useState<TodayItem[]>([]);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'task' | 'routine' | 'appointment'>('all');
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -73,6 +74,17 @@ export default function HojePage() {
   const totalCount = items.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+  const filteredItems = filter === 'all' ? items : items.filter(i => i.type === filter);
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'task': return '✓';
+      case 'routine': return '↻';
+      case 'appointment': return '📅';
+      default: return '•';
+    }
+  };
+
   return (
     <ShellLayout>
       <div className="max-w-4xl mx-auto animate-fade-in">
@@ -94,20 +106,25 @@ export default function HojePage() {
           </div>
         </div>
 
-        {/* Progress Bar */}
+        {/* Progress Overview */}
         {totalCount > 0 && (
-          <div className="card p-4 mb-6 hud-border">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-mono text-xs text-[var(--color-text-dim)] tracking-wider">PROGRESSO DO DIA</span>
-              <span className="font-orbitron text-sm font-bold text-[var(--color-primary)]">{progressPercent}%</span>
+          <div className="card p-5 mb-6 hud-border">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-orbitron text-sm font-bold text-[var(--color-text)]">Progresso do Dia</h3>
+                <p className="text-xs text-[var(--color-text-muted)]">{completedCount} de {totalCount} itens concluídos</p>
+              </div>
+              <div className="text-right">
+                <p className="font-orbitron text-2xl font-bold text-[var(--color-primary)]">{progressPercent}%</p>
+              </div>
             </div>
-            <div className="h-2 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
+            <div className="h-3 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-light)] rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <div className="flex items-center justify-between mt-2">
+            <div className="flex items-center justify-between mt-3">
               <span className="text-xs text-[var(--color-text-muted)]">{completedCount} concluídas</span>
               <span className="text-xs text-[var(--color-text-muted)]">{totalCount - completedCount} restantes</span>
             </div>
@@ -117,7 +134,6 @@ export default function HojePage() {
         {/* Briefing da IA */}
         {briefing && (
           <div className="card p-5 mb-6 hud-border relative overflow-hidden">
-            {/* Background glow */}
             <div className="absolute top-0 right-0 w-32 h-32 bg-[var(--color-primary)]/5 rounded-full blur-3xl -z-10" />
 
             <div className="flex items-start gap-4">
@@ -140,13 +156,40 @@ export default function HojePage() {
           </div>
         )}
 
+        {/* Filter Tabs */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+          {[
+            { key: 'all', label: 'Todos', count: items.length },
+            { key: 'task', label: 'Tarefas', count: items.filter(i => i.type === 'task').length },
+            { key: 'routine', label: 'Rotinas', count: items.filter(i => i.type === 'routine').length },
+            { key: 'appointment', label: 'Compromissos', count: items.filter(i => i.type === 'appointment').length },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setFilter(tab.key as any)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+                filter === tab.key
+                  ? 'bg-[var(--color-primary)] text-white'
+                  : 'bg-[var(--color-surface-2)]/50 text-[var(--color-text-dim)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]'
+              }`}
+            >
+              {tab.label}
+              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                filter === tab.key ? 'bg-white/20' : 'bg-[var(--color-surface-2)]'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
         {/* Timeline */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-16">
             <div className="w-12 h-12 rounded-full border-2 border-[var(--color-surface-2)] border-t-[var(--color-primary)] animate-spin mb-4" />
             <p className="text-[var(--color-text-dim)] text-sm">Carregando seu dia...</p>
           </div>
-        ) : items.length === 0 ? (
+        ) : filteredItems.length === 0 ? (
           <div className="card p-12 text-center hud-border">
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-surface-2)] flex items-center justify-center">
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5">
@@ -154,19 +197,25 @@ export default function HojePage() {
                 <polyline points="12 6 12 12 16 14" />
               </svg>
             </div>
-            <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">Dia livre!</p>
-            <p className="text-[var(--color-text-dim)] text-sm mb-4">Nada agendado para hoje.</p>
+            <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">
+              {filter === 'all' ? 'Dia livre!' : `Nenhum ${filter} hoje`}
+            </p>
+            <p className="text-[var(--color-text-dim)] text-sm mb-4">
+              {filter === 'all' 
+                ? 'Aproveite seu tempo livre ou planeje novas atividades.'
+                : 'Tente selecionar outro filtro.'}
+            </p>
             <a href="/dashboard" className="btn btn-primary inline-flex">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19" />
                 <line x1="5" y1="12" x2="19" y2="12" />
               </svg>
-              Criar tarefa
+              Ir para Dashboard
             </a>
           </div>
         ) : (
           <div className="space-y-2">
-            {items.map((item, index) => {
+            {filteredItems.map((item, index) => {
               const isPast = item.time !== '—' && item.time < currentTime && !item.done;
               const isCurrent = item.time !== '—' && item.time === currentTime;
 
@@ -221,6 +270,15 @@ export default function HojePage() {
                     )}
                   </div>
 
+                  {/* Type indicator */}
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm shrink-0 ${
+                    item.type === 'task' ? 'bg-[var(--color-success-glow)] text-[var(--color-success)]' :
+                    item.type === 'routine' ? 'bg-[var(--color-primary-subtle)] text-[var(--color-primary)]' :
+                    'bg-[var(--color-info-glow)] text-[var(--color-info)]'
+                  }`}>
+                    {getTypeIcon(item.type)}
+                  </div>
+
                   {/* Content */}
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium truncate ${item.done ? 'line-through text-[var(--color-text-muted)]' : 'text-[var(--color-text)]'}`}>
@@ -233,6 +291,28 @@ export default function HojePage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Summary Footer */}
+        {totalCount > 0 && (
+          <div className="mt-8 p-4 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-subtle)]">
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-4">
+                <span className="text-[var(--color-text-dim)]">
+                  <span className="font-bold text-[var(--color-success)]">{items.filter(i => i.type === 'task').length}</span> tarefas
+                </span>
+                <span className="text-[var(--color-text-dim)]">
+                  <span className="font-bold text-[var(--color-primary)]">{items.filter(i => i.type === 'routine').length}</span> rotinas
+                </span>
+                <span className="text-[var(--color-text-dim)]">
+                  <span className="font-bold text-[var(--color-info)]">{items.filter(i => i.type === 'appointment').length}</span> compromissos
+                </span>
+              </div>
+              <span className="text-[var(--color-text-muted)] text-xs">
+                Atualizado às {currentTime}
+              </span>
+            </div>
           </div>
         )}
       </div>

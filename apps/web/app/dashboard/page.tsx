@@ -3,58 +3,113 @@
 import { useState, useEffect } from 'react';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import { QuickInput } from '../../components/ai/QuickInput';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, LineChart, Line, PieChart, Pie } from 'recharts';
+
+const API = 'http://localhost:3002';
 
 const weeklyData = [
-  { day: 'SEG', progress: 75 },
-  { day: 'TER', progress: 60 },
-  { day: 'QUA', progress: 90 },
-  { day: 'QUI', progress: 45 },
-  { day: 'SEX', progress: 80 },
-  { day: 'SAB', progress: 30 },
-  { day: 'DOM', progress: 55 },
+  { day: 'SEG', progress: 75, tasks: 8 },
+  { day: 'TER', progress: 60, tasks: 6 },
+  { day: 'QUA', progress: 90, tasks: 10 },
+  { day: 'QUI', progress: 45, tasks: 5 },
+  { day: 'SEX', progress: 80, tasks: 9 },
+  { day: 'SAB', progress: 30, tasks: 3 },
+  { day: 'DOM', progress: 55, tasks: 4 },
+];
+
+const categoryData = [
+  { name: 'Pessoal', value: 35, color: '#FF2B51' },
+  { name: 'Trabalho', value: 25, color: '#6C4CFF' },
+  { name: 'Estudo', value: 20, color: '#00CC44' },
+  { name: 'Saúde', value: 15, color: '#FF9500' },
+  { name: 'Outros', value: 5, color: '#00B4D8' },
 ];
 
 export default function DashboardPage() {
   const [activeGoals, setActiveGoals] = useState(0);
   const [totalTasks, setTotalTasks] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
+  const [streak, setStreak] = useState(5);
+  const [nextRoutine, setNextRoutine] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3002/goals?status=ACTIVE')
-      .then(r => r.json())
-      .then(data => setActiveGoals(Array.isArray(data) ? data.length : 0))
-      .catch(() => setActiveGoals(0));
-    fetch('http://localhost:3002/tasks')
-      .then(r => r.json())
-      .then(data => {
-        const tasks = Array.isArray(data) ? data : [];
-        setTotalTasks(tasks.length);
-        setCompletedToday(tasks.filter((t: any) => t.completed).length);
-      })
-      .catch(() => { setTotalTasks(0); setCompletedToday(0); });
+    const fetchData = async () => {
+      try {
+        const [goalsRes, tasksRes, routinesRes] = await Promise.all([
+          fetch(`${API}/goals?status=ACTIVE`),
+          fetch(`${API}/tasks`),
+          fetch(`${API}/routines`),
+        ]);
+
+        const goals = await goalsRes.json();
+        const tasks = await tasksRes.json();
+        const routines = await routinesRes.json();
+
+        setActiveGoals(Array.isArray(goals) ? goals.length : 0);
+        
+        const tasksArray = Array.isArray(tasks) ? tasks : [];
+        setTotalTasks(tasksArray.length);
+        setCompletedToday(tasksArray.filter((t: any) => t.completed).length);
+
+        // Encontrar próxima rotina
+        const activeRoutines = Array.isArray(routines) ? routines.filter((r: any) => r.active) : [];
+        if (activeRoutines.length > 0) {
+          setNextRoutine(activeRoutines[0].title);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
   }, []);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bom dia';
+    if (hour < 18) return 'Boa tarde';
+    return 'Boa noite';
+  };
+
+  const progressPercent = totalTasks > 0 ? Math.round((completedToday / totalTasks) * 100) : 0;
 
   return (
     <ShellLayout>
-      <div className="max-w-6xl mx-auto animate-fade-in">
+      <div className="max-w-7xl mx-auto animate-fade-in">
         {/* Header Section */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="relative">
-              <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-alt)] flex items-center justify-center shadow-glow">
-                <span className="font-orbitron text-2xl font-bold text-white">Z</span>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-alt)] flex items-center justify-center shadow-glow">
+                  <span className="font-orbitron text-2xl font-bold text-white">Z</span>
+                </div>
+                <div className="absolute inset-0 rounded-2xl bg-[var(--color-primary)]/20 blur-xl -z-10" />
               </div>
-              {/* Glow ring */}
-              <div className="absolute inset-0 rounded-xl bg-[var(--color-primary)]/20 blur-xl -z-10" />
+              <div>
+                <h1 className="font-orbitron text-3xl font-bold text-[var(--color-text)]">
+                  {getGreeting()}, <span className="text-[var(--color-primary)]">Explorador</span>
+                </h1>
+                <p className="text-[var(--color-text-dim)] text-sm">
+                  {new Date().toLocaleDateString('pt-BR', { 
+                    weekday: 'long', 
+                    day: 'numeric', 
+                    month: 'long',
+                    year: 'numeric'
+                  })}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="font-orbitron text-2xl font-bold text-[var(--color-text)]">
-                Bom dia, <span className="text-[var(--color-primary)]">Explorador</span>
-              </h1>
-              <p className="text-[var(--color-text-dim)] text-sm">
-                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </p>
+            
+            {/* Quick Stats Mini */}
+            <div className="hidden md:flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-xs text-[var(--color-text-muted)]">Sequência</p>
+                <p className="font-orbitron text-xl font-bold text-[var(--color-warning)]">🔥 {streak} dias</p>
+              </div>
             </div>
           </div>
         </div>
@@ -65,59 +120,63 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <StatCard
             label="METAS ATIVAS"
             value={activeGoals.toString()}
+            subtitle="em progresso"
             icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <circle cx="12" cy="12" r="10" />
                 <circle cx="12" cy="12" r="6" />
                 <circle cx="12" cy="12" r="2" />
               </svg>
             }
             color="primary"
+            trend="+2 esta semana"
           />
           <StatCard
             label="TAREFAS"
             value={totalTasks.toString()}
             subtitle={`${completedToday} concluídas`}
             icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M9 11l3 3L22 4" />
                 <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
               </svg>
             }
             color="success"
+            trend={`${progressPercent}% hoje`}
           />
           <StatCard
             label="SEQUÊNCIA"
-            value="5"
+            value={streak.toString()}
             subtitle="dias seguidos"
             icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
             }
             color="warning"
+            trend="recorde pessoal!"
           />
           <StatCard
-            label="PROGRESSO"
-            value="62%"
-            subtitle="esta semana"
+            label="PRÓXIMA ROTINA"
+            value={nextRoutine || '—'}
+            subtitle="hoje"
             icon={
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <line x1="18" y1="20" x2="18" y2="10" />
-                <line x1="12" y1="20" x2="12" y2="4" />
-                <line x1="6" y1="20" x2="6" y2="14" />
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <circle cx="12" cy="12" r="10" />
+                <polyline points="12 6 12 12 16 14" />
               </svg>
             }
             color="info"
+            trend="em breve"
           />
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           {/* Weekly Progress Chart */}
           <div className="lg:col-span-2 card p-6 hud-border">
             <div className="flex items-center justify-between mb-6">
@@ -130,7 +189,7 @@ export default function DashboardPage() {
                 Ativo
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={240}>
               <BarChart data={weeklyData} barCategoryGap="20%">
                 <XAxis
                   dataKey="day"
@@ -158,6 +217,40 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </div>
 
+          {/* Category Distribution */}
+          <div className="card p-6 hud-border">
+            <h2 className="font-orbitron text-lg font-bold text-[var(--color-text)] mb-4">Distribuição por Categoria</h2>
+            <ResponsiveContainer width="100%" height={180}>
+              <PieChart>
+                <Pie
+                  data={categoryData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={40}
+                  outerRadius={70}
+                  paddingAngle={2}
+                  dataKey="value"
+                >
+                  {categoryData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {categoryData.map((cat) => (
+                <div key={cat.name} className="flex items-center gap-2 text-xs">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                  <span className="text-[var(--color-text-dim)]">{cat.name}</span>
+                  <span className="text-[var(--color-text-muted)] ml-auto">{cat.value}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions & Recent Activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Quick Actions */}
           <div className="card p-6 hud-border">
             <h2 className="font-orbitron text-lg font-bold text-[var(--color-text)] mb-4">Ações Rápidas</h2>
@@ -197,6 +290,18 @@ export default function DashboardPage() {
                 }
               />
               <QuickAction
+                href="/databases"
+                label="Novo Database"
+                description="Criar base de dados"
+                icon={
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <ellipse cx="12" cy="5" rx="9" ry="3" />
+                    <path d="M3 5v14c0 1.66 4.03 3 9 3s9-1.34 9-3V5" />
+                    <path d="M3 12c0 1.66 4.03 3 9 3s9-1.34 9-3" />
+                  </svg>
+                }
+              />
+              <QuickAction
                 href="/calendario"
                 label="Agendar"
                 description="Marcar compromisso"
@@ -211,6 +316,49 @@ export default function DashboardPage() {
               />
             </div>
           </div>
+
+          {/* Daily Progress */}
+          <div className="card p-6 hud-border">
+            <h2 className="font-orbitron text-lg font-bold text-[var(--color-text)] mb-4">Progresso de Hoje</h2>
+            
+            {/* Progress Bar */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-[var(--color-text-dim)]">Tarefas concluídas</span>
+                <span className="font-orbitron text-sm font-bold text-[var(--color-primary)]">{progressPercent}%</span>
+              </div>
+              <div className="h-3 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-light)] rounded-full transition-all duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-xs text-[var(--color-text-muted)]">{completedToday} concluídas</span>
+                <span className="text-xs text-[var(--color-text-muted)]">{totalTasks - completedToday} restantes</span>
+              </div>
+            </div>
+
+            {/* Motivational Quote */}
+            <div className="p-4 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-subtle)]">
+              <p className="text-sm text-[var(--color-text-secondary)] italic mb-2">
+                "O sucesso é a soma de pequenos esforços repetidos dia após dia."
+              </p>
+              <p className="text-xs text-[var(--color-text-muted)]">— Robert Collier</p>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+              <div className="p-3 rounded-lg bg-[var(--color-surface-2)]/20">
+                <p className="text-xs text-[var(--color-text-muted)] mb-1">Tempo focado</p>
+                <p className="font-orbitron text-lg font-bold text-[var(--color-text)]">2h 30m</p>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--color-surface-2)]/20">
+                <p className="text-xs text-[var(--color-text-muted)] mb-1">Produtividade</p>
+                <p className="font-orbitron text-lg font-bold text-[var(--color-success)]">Alta</p>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </ShellLayout>
@@ -218,12 +366,13 @@ export default function DashboardPage() {
 }
 
 // Stat Card Component
-function StatCard({ label, value, subtitle, icon, color }: {
+function StatCard({ label, value, subtitle, icon, color, trend }: {
   label: string;
   value: string;
   subtitle?: string;
   icon: React.ReactNode;
   color: 'primary' | 'success' | 'warning' | 'info';
+  trend?: string;
 }) {
   const colorMap = {
     primary: {
@@ -255,8 +404,7 @@ function StatCard({ label, value, subtitle, icon, color }: {
   const colors = colorMap[color];
 
   return (
-    <div className="card p-4 relative overflow-hidden group hover:border-[var(--border-strong)] transition-all duration-300">
-      {/* Background glow on hover */}
+    <div className="card p-5 relative overflow-hidden group hover:border-[var(--border-strong)] transition-all duration-300">
       <div
         className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"
         style={{ background: `radial-gradient(circle at 50% 50%, ${colors.bg}, transparent 70%)` }}
@@ -264,11 +412,14 @@ function StatCard({ label, value, subtitle, icon, color }: {
 
       <div className="flex items-start justify-between mb-3">
         <div
-          className="p-2 rounded-lg"
+          className="p-2.5 rounded-lg"
           style={{ background: colors.bg, color: colors.text }}
         >
           {icon}
         </div>
+        {trend && (
+          <span className="text-[10px] text-[var(--color-text-muted)] font-mono">{trend}</span>
+        )}
       </div>
       <p className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider mb-1">{label}</p>
       <p className="font-orbitron text-2xl font-bold" style={{ color: colors.text }}>{value}</p>
