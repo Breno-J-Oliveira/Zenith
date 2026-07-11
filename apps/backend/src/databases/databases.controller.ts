@@ -120,9 +120,9 @@ export class DatabasesController {
     return this.databasesService.removeView(viewId);
   }
 
-  // ─── PRESETS ───────────────────────────────────────────────
+  // ─── PRESETS (rota deve vir antes de :id para evitar conflito) ──
 
-  @Post('presets/:presetType')
+  @Post('create-from-preset/:presetType')
   createFromPreset(@Param('presetType') presetType: string) {
     return this.databasesService.createFromPreset(presetType);
   }
