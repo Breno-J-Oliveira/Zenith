@@ -65,6 +65,9 @@ export default function DatabasesPage() {
     fetchDatabases();
   }, []);
 
+  const totalRows = databases.reduce((acc, db) => acc + (db._count?.rows || 0), 0);
+  const presetCount = databases.filter(db => db.isPreset).length;
+
   const handleSelectDatabase = async (db: Database) => {
     // Busca detalhes completos com rows
     const res = await fetch(`${API}/databases/${db.id}`);
@@ -153,6 +156,24 @@ export default function DatabasesPage() {
             Novo Database
           </button>
         </div>
+
+        {/* Stats Overview */}
+        {databases.length > 0 && !selectedDb && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Total</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-text)]">{databases.length}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Itens</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-primary)]">{totalRows}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Presets</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-success)]">{presetCount}</p>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         {loading ? (

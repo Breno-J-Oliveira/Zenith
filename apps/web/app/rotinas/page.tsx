@@ -120,12 +120,14 @@ export default function RotinasPage() {
 
   const activeRoutines = routines.filter(r => r.active).length;
   const totalMinutes = routines.filter(r => r.active).reduce((acc, r) => acc + r.duration, 0);
+  const totalHours = Math.floor(totalMinutes / 60);
+  const remainingMinutes = totalMinutes % 60;
 
   return (
     <ShellLayout>
       <div className="max-w-5xl mx-auto animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-[var(--color-success-glow)] text-[var(--color-success)]">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -149,6 +151,26 @@ export default function RotinasPage() {
             {showCreateForm ? 'Cancelar' : 'Nova Rotina'}
           </button>
         </div>
+
+        {/* Stats Overview */}
+        {routines.length > 0 && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Total</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-text)]">{routines.length}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Ativas</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-success)]">{activeRoutines}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Tempo/Dia</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-primary)]">
+                {totalHours > 0 ? `${totalHours}h` : ''}{remainingMinutes}m
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Create Form */}
         {showCreateForm && (

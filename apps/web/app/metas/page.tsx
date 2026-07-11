@@ -170,12 +170,21 @@ export default function MetasPage() {
 
   const activeGoals = goals.filter(g => g.status === 'ACTIVE').length;
   const completedGoals = goals.filter(g => g.status === 'COMPLETED').length;
+  const avgProgress = goals.length > 0 
+    ? Math.round(goals.reduce((acc, g) => acc + calcProgress(g), 0) / goals.length) 
+    : 0;
+
+  const priorityColors: Record<string, string> = {
+    alta: 'var(--color-danger)',
+    media: 'var(--color-warning)',
+    baixa: 'var(--color-success)',
+  };
 
   return (
     <ShellLayout>
       <div className="max-w-5xl mx-auto animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg bg-[var(--color-primary-subtle)] text-[var(--color-primary)]">
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -200,6 +209,24 @@ export default function MetasPage() {
             {showCreateForm ? 'Cancelar' : 'Nova Meta'}
           </button>
         </div>
+
+        {/* Stats Overview */}
+        {goals.length > 0 && (
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Total</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-text)]">{goals.length}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Em Progresso</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-primary)]">{activeGoals}</p>
+            </div>
+            <div className="card p-4 text-center">
+              <p className="text-xs text-[var(--color-text-muted)] mb-1">Progresso Médio</p>
+              <p className="font-orbitron text-2xl font-bold text-[var(--color-success)]">{avgProgress}%</p>
+            </div>
+          </div>
+        )}
 
         {/* Create Form */}
         {showCreateForm && (
