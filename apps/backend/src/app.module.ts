@@ -10,6 +10,7 @@ import { RoutinesModule } from './routines/routines.module';
 import { SchedulerModule } from './scheduler/scheduler.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { PagesModule } from './pages/pages.module';
+import { DatabasesModule } from './databases/databases.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { PagesModule } from './pages/pages.module';
     SchedulerModule,
     CalendarModule,
     PagesModule,
+    DatabasesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

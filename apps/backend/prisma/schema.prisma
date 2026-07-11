@@ -21,6 +21,7 @@ model User {
   appointments Appointment[]
   aiLogs       AILog[]
   pages        Page[]
+  databases    Database[]
 }
 
 // ─── Goal ───
@@ -141,6 +142,7 @@ model Page {
   parent    Page?    @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
   children  Page[]   @relation("PageTree")
   blocks    Block[]
+  databases Database[]
 
   @@index([userId])
   @@index([parentId])
@@ -158,4 +160,74 @@ model Block {
   page      Page     @relation(fields: [pageId], references: [id], onDelete: Cascade)
 
   @@index([pageId])
+}
+
+// ═══════════════════════════════════════════════════════════
+// FASE 8 — Motor de Database Flexível (tipo Notion)
+// ═══════════════════════════════════════════════════════════
+
+// ─── Database (base de dados flexível) ───
+model Database {
+  id          String     @id @default(cuid())
+  userId      String
+  pageId      String?    // pode viver dentro de uma página, ou ser raiz
+  title       String
+  icon        String?
+  isPreset    Boolean    @default(false)
+  presetType  String?    // "finance" | "shopping" | "study" | "habits" | null
+  properties  Property[]
+  rows        Row[]
+  views       View[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  page        Page?      @relation(fields: [pageId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([pageId])
+}
+
+// ─── Property (coluna/propriedade do database) ───
+model Property {
+  id          String   @id @default(cuid())
+  databaseId  String
+  name        String
+  type        String   // text | number | currency | date | checkbox | select | multi_select | relation
+  options     String?  // JSON — opções de select/multi_select, formato de moeda, etc.
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  database    Database @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  @@index([databaseId])
+}
+
+// ─── Row (linha/item do database) ───
+model Row {
+  id          String   @id @default(cuid())
+  databaseId  String
+  values      String   // JSON — { propertyId: valor }
+  coverImage  String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  database    Database @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  @@index([databaseId])
+}
+
+// ─── View (visualização do database) ───
+model View {
+  id          String   @id @default(cuid())
+  databaseId  String
+  name        String
+  type        String   // table | gallery | list | board
+  config      String   // JSON — filtros, ordenação, agrupamento
+  createdAt   DateTime @default(now())
+
+  database    Database @relation(fields: [databaseId], references: [id], onDelete: Cascade)
+
+  @@index([databaseId])
 }
