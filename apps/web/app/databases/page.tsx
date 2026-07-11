@@ -8,6 +8,13 @@ import { CreateDatabaseModal } from '../../components/databases/CreateDatabaseMo
 
 const API = 'http://localhost:3002';
 
+interface Row {
+  id: string;
+  values: string;
+  coverImage: string | null;
+  order: number;
+}
+
 interface Database {
   id: string;
   title: string;
@@ -16,6 +23,7 @@ interface Database {
   presetType: string | null;
   properties: Property[];
   views: View[];
+  rows?: Row[];
   _count: { rows: number };
 }
 

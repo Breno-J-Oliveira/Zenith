@@ -24,7 +24,7 @@ interface Database {
   title: string;
   icon: string | null;
   properties: Property[];
-  rows: Row[];
+  rows?: Row[];
 }
 
 interface DatabaseTableProps {
@@ -37,7 +37,7 @@ export function DatabaseTable({ database, onUpdate }: DatabaseTableProps) {
   const [editValue, setEditValue] = useState('');
 
   const sortedProperties = [...database.properties].sort((a, b) => a.order - b.order);
-  const sortedRows = [...(database.rows || [])].sort((a, b) => a.order - b.order);
+  const sortedRows = [...(database.rows ?? [])].sort((a, b) => a.order - b.order);
 
   const getCellValue = (row: Row, propId: string): string => {
     try {

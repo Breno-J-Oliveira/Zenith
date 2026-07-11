@@ -24,7 +24,7 @@ interface Database {
   title: string;
   icon: string | null;
   properties: Property[];
-  rows: Row[];
+  rows?: Row[];
 }
 
 interface DatabaseGalleryProps {
@@ -36,7 +36,7 @@ export function DatabaseGallery({ database, onUpdate }: DatabaseGalleryProps) {
   const [selectedRow, setSelectedRow] = useState<Row | null>(null);
 
   const sortedProperties = [...database.properties].sort((a, b) => a.order - b.order);
-  const sortedRows = [...(database.rows || [])].sort((a, b) => a.order - b.order);
+  const sortedRows = [...(database.rows ?? [])].sort((a, b) => a.order - b.order);
 
   const getCellValue = (row: Row, propId: string): string => {
     try {
