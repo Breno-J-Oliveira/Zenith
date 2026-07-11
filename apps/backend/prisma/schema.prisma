@@ -231,3 +231,53 @@ model View {
 
   @@index([databaseId])
 }
+
+// ═══════════════════════════════════════════════════════════
+// FASE 9 — Chat com IA (histórico persistente)
+// ═══════════════════════════════════════════════════════════
+
+// ─── ChatThread (conversa com a IA) ───
+model ChatThread {
+  id          String        @id @default(cuid())
+  userId      String
+  title       String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  messages    ChatMessage[]
+
+  @@index([userId])
+}
+
+// ─── ChatMessage (mensagens do chat) ───
+model ChatMessage {
+  id          String   @id @default(cuid())
+  threadId    String
+  role        String   // user | assistant | tool
+  content     String
+  toolCalls   String?  // JSON — ferramentas chamadas
+  createdAt   DateTime @default(now())
+
+  thread      ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId])
+}
+
+// ═══════════════════════════════════════════════════════════
+// FASE 14 — Notificações
+// ═══════════════════════════════════════════════════════════
+
+// ─── Notification ───
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  body        String
+  type        String   @default("info") // info | success | warning | error
+  read        Boolean  @default(false)
+  relatedType String?  // task | goal | appointment | routine
+  relatedId   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([read])
+}

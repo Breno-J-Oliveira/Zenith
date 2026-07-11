@@ -11,6 +11,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { PagesModule } from './pages/pages.module';
 import { DatabasesModule } from './databases/databases.module';
+import { ChatModule } from './chat/chat.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { DatabasesModule } from './databases/databases.module';
     CalendarModule,
     PagesModule,
     DatabasesModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

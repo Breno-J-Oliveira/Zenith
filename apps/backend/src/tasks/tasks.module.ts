@@ -7,5 +7,6 @@ import { GoalsModule } from '../goals/goals.module';
   imports: [GoalsModule],
   controllers: [TasksController],
   providers: [TasksService],
+  exports: [TasksService],
 })
 export class TasksModule {}
