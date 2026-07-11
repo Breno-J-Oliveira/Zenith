@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Orbitron, Space_Mono, Rajdhani } from 'next/font/google'
 import './globals.css'
+import { AuthProvider } from '../components/auth/AuthProvider'
 
 const orbitron = Orbitron({ 
   subsets: ['latin'],
@@ -38,7 +39,9 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" data-theme="red">
       <body className={`${orbitron.variable} ${spaceMono.variable} ${rajdhani.variable}`}>
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   )
