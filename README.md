@@ -200,16 +200,16 @@ O projeto foi desenvolvido como **projeto de portfólio pessoal** (solo), demons
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Zenith Backend (porta 3002)                  │
-│                                                                  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────────┐ │
-│  │  Goals   │ │  Tasks   │ │ Routines │ │   Appointments     │ │
-│  │  Module  │ │  Module  │ │  Module  │ │   (Scheduler)      │ │
-│  │ CRUD     │ │ CRUD     │ │ CRUD     │ │ ConflictResolver   │ │
-│  │ Milestone│ │ Toggle   │ │ Generate │ │ Reorganization     │ │
-│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────────┬───────────┘ │
+│                     Zenith Backend (porta 3002)                 │
+│                                                                 │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────────────┐ │
+│  │  Goals   │ │  Tasks   │ │ Routines │ │   Appointments      │ │
+│  │  Module  │ │  Module  │ │  Module  │ │   (Scheduler)       │ │
+│  │ CRUD     │ │ CRUD     │ │ CRUD     │ │ ConflictResolver    │ │
+│  │ Milestone│ │ Toggle   │ │ Generate │ │ Reorganization      │ │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └─────────┬───────────┘ │
 │       │            │            │                 │             │
-│  ┌────┴────────────┴────────────┴─────────────────┴──────────┐ │
+│  ┌────┴────────────┴────────────┴─────────────────┴───────────┐ │
 │  │                      Database Module                       │ │
 │  │  CRUD Databases · CRUD Properties · CRUD Rows · CRUD Views │ │
 │  │  Presets: Finance · Shopping · Study · Habits              │ │
@@ -226,12 +226,12 @@ O projeto foi desenvolvido como **projeto de portfólio pessoal** (solo), demons
 │  │  PATCH /calendar/reschedule                                │ │
 │  └────────────────────────────────────────────────────────────┘ │
 │  ┌────────────────────────────────────────────────────────────┐ │
-│  │                    Prisma ORM (SQLite/PostgreSQL)           │ │
+│  │                    Prisma ORM (SQLite/PostgreSQL)          │ │
 │  └────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
           ▲              ▲              ▲              ▲
           │              │              │              │
-    ┌─────┴────┐  ┌──────┴──────┐ ┌────┴──────┐ ┌─────┴──────┐
+    ┌─────┴────┐  ┌──────┴──────┐ ┌─────┴─────┐ ┌──────┴─────┐
     │   Web    │  │   Desktop   │ │  Mobile   │ │  NexusAuth │
     │ Next.js  │  │   Tauri 2   │ │ Expo/RN   │ │  (futuro)  │
     │ :3000    │  │  (futuro)   │ │ (futuro)  │ │            │
