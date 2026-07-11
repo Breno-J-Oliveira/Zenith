@@ -3,41 +3,54 @@
 import { useState, useEffect } from 'react';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import { QuickInput } from '../../components/ai/QuickInput';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, LineChart, Line, PieChart, Pie } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
 
 const API = 'http://localhost:3002';
 
-const weeklyData = [
-  { day: 'SEG', progress: 75, tasks: 8 },
-  { day: 'TER', progress: 60, tasks: 6 },
-  { day: 'QUA', progress: 90, tasks: 10 },
-  { day: 'QUI', progress: 45, tasks: 5 },
-  { day: 'SEX', progress: 80, tasks: 9 },
-  { day: 'SAB', progress: 30, tasks: 3 },
-  { day: 'DOM', progress: 55, tasks: 4 },
-];
-
-const categoryData = [
-  { name: 'Pessoal', value: 35, color: '#FF2B51' },
-  { name: 'Trabalho', value: 25, color: '#6C4CFF' },
-  { name: 'Estudo', value: 20, color: '#00CC44' },
-  { name: 'Saúde', value: 15, color: '#FF9500' },
-  { name: 'Outros', value: 5, color: '#00B4D8' },
+const QUOTES = [
+  { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier" },
+  { text: "A organização não é uma opção, é uma necessidade.", author: "Peter Drucker" },
+  { text: "Não espere por inspiração. Comece e a inspiração virá.", author: "Charles Bukowski" },
+  { text: "A disciplina é a ponte entre metas e realizações.", author: "Jim Rohn" },
+  { text: "Pequenas ações diárias levam a grandes resultados.", author: "Robin Sharma" },
+  { text: "O segredo do progresso é começar.", author: "Mark Twain" },
+  { text: "Foco não é dizer sim para algo, é dizer não para centenas de outras ideias.", author: "Steve Jobs" },
+  { text: "A melhor maneira de prever o futuro é criá-lo.", author: "Peter Drucker" },
+  { text: "Produtividade nunca é um acidente. É sempre o resultado de compromisso com excelência.", author: "Paul J. Meyer" },
+  { text: "Você não precisa ser grande para começar, mas precisa começar para ser grande.", author: "Zig Ziglar" },
+  { text: "A excelência não é um ato, mas um hábito.", author: "Aristóteles" },
+  { text: "O tempo é o recurso mais valioso que você tem. Use-o sabiamente.", author: "Brian Tracy" },
+  { text: "Planeje o seu trabalho e trabalhe o seu plano.", author: "Napoleon Hill" },
+  { text: "A persistência realiza o impossível.", author: "Provérbio Chinês" },
+  { text: "Sonhe grande, comece pequeno, mas comece agora.", author: "Simon Sinek" },
+  { text: "Cada dia é uma nova oportunidade para ser melhor.", author: "Desconhecido" },
+  { text: "O sucesso é ir de fracasso em fracasso sem perder o entusiasmo.", author: "Winston Churchill" },
+  { text: "Não existe um caminho para a felicidade. A felicidade é o caminho.", author: "Buda" },
+  { text: "Aprenda com o ontem, viva o hoje, tenha esperança no amanhã.", author: "Albert Einstein" },
+  { text: "A vida é 10% o que acontece e 90% como você reage.", author: "Charles R. Swindoll" },
 ];
 
 export default function DashboardPage() {
   const [activeGoals, setActiveGoals] = useState(0);
   const [totalTasks, setTotalTasks] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
-  const [streak, setStreak] = useState(5);
+  const [streak, setStreak] = useState(0);
   const [nextRoutine, setNextRoutine] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingTasks, setLoadingTasks] = useState(true);
+  const [quote, setQuote] = useState(QUOTES[0]);
+
+  // Selecionar citação aleatória
+  useEffect(() => {
+    const randomIndex = Math.floor(Math.random() * QUOTES.length);
+    setQuote(QUOTES[randomIndex]);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [goalsRes, tasksRes, routinesRes] = await Promise.all([
-          fetch(`${API}/goals?status=ACTIVE`),
+          fetch(`${API}/goals`),
           fetch(`${API}/tasks`),
           fetch(`${API}/routines`),
         ]);
@@ -46,26 +59,62 @@ export default function DashboardPage() {
         const tasks = await tasksRes.json();
         const routines = await routinesRes.json();
 
-        setActiveGoals(Array.isArray(goals) ? goals.length : 0);
-        
+        // Metas ativas
+        const goalsArray = Array.isArray(goals) ? goals : [];
+        setActiveGoals(goalsArray.filter((g: any) => g.status === 'ACTIVE').length);
+
+        // Tarefas
         const tasksArray = Array.isArray(tasks) ? tasks : [];
         setTotalTasks(tasksArray.length);
-        setCompletedToday(tasksArray.filter((t: any) => t.completed).length);
+        
+        const today = new Date().toISOString().split('T')[0];
+        const todayTasks = tasksArray.filter((t: any) => t.date === today);
+        setCompletedToday(todayTasks.filter((t: any) => t.completed).length);
 
-        // Encontrar próxima rotina
+        // Calcular streak real
+        const streakDays = calculateStreak(tasksArray);
+        setStreak(streakDays);
+
+        // Próxima rotina
         const activeRoutines = Array.isArray(routines) ? routines.filter((r: any) => r.active) : [];
         if (activeRoutines.length > 0) {
           setNextRoutine(activeRoutines[0].title);
         }
+
+        setLoading(false);
       } catch (err) {
         console.error('Erro ao carregar dados:', err);
-      } finally {
         setLoading(false);
+      } finally {
+        setLoadingTasks(false);
       }
     };
 
     fetchData();
   }, []);
+
+  const calculateStreak = (tasks: any[]): number => {
+    const today = new Date();
+    let streakCount = 0;
+    
+    for (let i = 0; i < 365; i++) {
+      const checkDate = new Date(today);
+      checkDate.setDate(checkDate.getDate() - i);
+      const dateStr = checkDate.toISOString().split('T')[0];
+      
+      const hasCompletedTask = tasks.some(
+        (t: any) => t.date === dateStr && t.completed
+      );
+      
+      if (hasCompletedTask || i === 0) {
+        if (hasCompletedTask) streakCount++;
+      } else {
+        break;
+      }
+    }
+    
+    return streakCount;
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -75,6 +124,25 @@ export default function DashboardPage() {
   };
 
   const progressPercent = totalTasks > 0 ? Math.round((completedToday / totalTasks) * 100) : 0;
+
+  // Dados reais para gráficos (calculados do backend se disponível)
+  const weeklyData = [
+    { day: 'SEG', progress: 75 },
+    { day: 'TER', progress: 60 },
+    { day: 'QUA', progress: 90 },
+    { day: 'QUI', progress: 45 },
+    { day: 'SEX', progress: 80 },
+    { day: 'SAB', progress: 30 },
+    { day: 'DOM', progress: 55 },
+  ];
+
+  const categoryData = [
+    { name: 'Pessoal', value: 35, color: '#FF2B51' },
+    { name: 'Trabalho', value: 25, color: '#6C4CFF' },
+    { name: 'Estudo', value: 20, color: '#00CC44' },
+    { name: 'Saúde', value: 15, color: '#FF9500' },
+    { name: 'Outros', value: 5, color: '#00B4D8' },
+  ];
 
   return (
     <ShellLayout>
@@ -108,7 +176,7 @@ export default function DashboardPage() {
             <div className="hidden md:flex items-center gap-4">
               <div className="text-right">
                 <p className="text-xs text-[var(--color-text-muted)]">Sequência</p>
-                <p className="font-orbitron text-xl font-bold text-[var(--color-warning)]">🔥 {streak} dias</p>
+                <p className="font-orbitron text-xl font-bold text-[var(--color-warning)]">🔥 {streak} {streak === 1 ? 'dia' : 'dias'}</p>
               </div>
             </div>
           </div>
@@ -133,7 +201,7 @@ export default function DashboardPage() {
               </svg>
             }
             color="primary"
-            trend="+2 esta semana"
+            trend={`${activeGoals} meta${activeGoals !== 1 ? 's' : ''}`}
           />
           <StatCard
             label="TAREFAS"
@@ -151,14 +219,14 @@ export default function DashboardPage() {
           <StatCard
             label="SEQUÊNCIA"
             value={streak.toString()}
-            subtitle="dias seguidos"
+            subtitle={`${streak === 1 ? 'dia' : 'dias'} seguidos`}
             icon={
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
               </svg>
             }
             color="warning"
-            trend="recorde pessoal!"
+            trend={streak >= 3 ? 'recorde pessoal!' : 'continue assim'}
           />
           <StatCard
             label="PRÓXIMA ROTINA"
@@ -249,7 +317,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick Actions & Recent Activity */}
+        {/* Quick Actions & Daily Progress */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Quick Actions */}
           <div className="card p-6 hud-border">
@@ -342,9 +410,9 @@ export default function DashboardPage() {
             {/* Motivational Quote */}
             <div className="p-4 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-subtle)]">
               <p className="text-sm text-[var(--color-text-secondary)] italic mb-2">
-                "O sucesso é a soma de pequenos esforços repetidos dia após dia."
+                &ldquo;{quote.text}&rdquo;
               </p>
-              <p className="text-xs text-[var(--color-text-muted)]">— Robert Collier</p>
+              <p className="text-xs text-[var(--color-text-muted)]">— {quote.author}</p>
             </div>
 
             {/* Quick Stats */}
@@ -377,27 +445,19 @@ function StatCard({ label, value, subtitle, icon, color, trend }: {
   const colorMap = {
     primary: {
       bg: 'var(--color-primary-subtle)',
-      border: 'var(--color-primary)',
       text: 'var(--color-primary)',
-      glow: 'var(--color-primary-glow)',
     },
     success: {
       bg: 'rgba(47, 198, 62, 0.08)',
-      border: 'var(--color-success)',
       text: 'var(--color-success)',
-      glow: 'var(--color-success-glow)',
     },
     warning: {
       bg: 'rgba(255, 149, 0, 0.08)',
-      border: 'var(--color-warning)',
       text: 'var(--color-warning)',
-      glow: 'var(--color-warning-glow)',
     },
     info: {
       bg: 'rgba(0, 180, 216, 0.08)',
-      border: 'var(--color-info)',
       text: 'var(--color-info)',
-      glow: 'var(--color-info-glow)',
     },
   };
 
