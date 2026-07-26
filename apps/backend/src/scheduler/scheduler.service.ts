@@ -1,18 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { RoutinesService } from '../routines/routines.service';
 import { ConflictResolver } from '../shared/conflict-resolver.service';
-import { PrismaService, MOCK_USER_ID } from '../prisma.service';
+import { PrismaService } from '../prisma.service';
 import {
   Appointment, CreateAppointmentDTO,
   ReorganizationResult, MovedTask, Task,
 } from '../../../../packages/shared/src/types';
 
-/**
- * SchedulerService — Reorganização de rotina quando um compromisso é criado.
- *
- * Usa ConflictResolver compartilhado para encontrar horário livre
- * (heurística: depois do conflito → antes do conflito).
- */
 @Injectable()
 export class SchedulerService {
   constructor(
@@ -21,10 +15,10 @@ export class SchedulerService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async createAppointment(dto: CreateAppointmentDTO): Promise<ReorganizationResult> {
+  async createAppointment(userId: string, dto: CreateAppointmentDTO): Promise<ReorganizationResult> {
     const appointment = await this.prisma.appointment.create({
       data: {
-        userId: MOCK_USER_ID,
+        userId,
         title: dto.title,
         date: dto.date,
         startTime: dto.startTime,
@@ -32,19 +26,19 @@ export class SchedulerService {
       },
     });
 
-    return this.reorganizeDay(this.toAppointment(appointment));
+    return this.reorganizeDay(userId, this.toAppointment(appointment));
   }
 
-  async findAll(): Promise<Appointment[]> {
+  async findAll(userId: string): Promise<Appointment[]> {
     const records = await this.prisma.appointment.findMany({
-      where: { userId: MOCK_USER_ID },
+      where: { userId },
       orderBy: { date: 'asc' },
     });
     return records.map(r => this.toAppointment(r));
   }
 
-  private async reorganizeDay(appointment: Appointment): Promise<ReorganizationResult> {
-    const dayTasks = await this.routinesService.getTasksForDate(appointment.date);
+  private async reorganizeDay(userId: string, appointment: Appointment): Promise<ReorganizationResult> {
+    const dayTasks = await this.routinesService.getTasksForDate(userId, appointment.date);
     const moved: MovedTask[] = [];
 
     const apptStart = this.conflictResolver.toMinutes(appointment.startTime);
@@ -60,7 +54,7 @@ export class SchedulerService {
 
       if (!this.conflictResolver.hasConflict(taskStart, taskEnd, apptStart, apptEnd)) continue;
 
-      const busy = await this.buildBusyList(appointment.date, dayTasks, task.id, appointment.id);
+      const busy = await this.buildBusyList(userId, appointment.date, dayTasks, task.id, appointment.id);
 
       const newSlot = this.conflictResolver.findFreeSlot({
         conflictStart: apptStart,
@@ -70,7 +64,7 @@ export class SchedulerService {
       });
       if (!newSlot) continue;
 
-      await this.routinesService.updateGeneratedTask(task.id, {
+      await this.routinesService.updateGeneratedTask(userId, task.id, {
         date: appointment.date,
         time: newSlot.time,
       } as any);
@@ -90,9 +84,9 @@ export class SchedulerService {
     return { appointment, moved, message };
   }
 
-  private async buildBusyList(date: string, dayTasks: Task[], excludeTaskId: string, excludeApptId: string) {
+  private async buildBusyList(userId: string, date: string, dayTasks: Task[], excludeTaskId: string, excludeApptId: string) {
     const appts = await this.prisma.appointment.findMany({
-      where: { date, id: { not: excludeApptId } },
+      where: { userId, date, id: { not: excludeApptId } },
     });
 
     return [

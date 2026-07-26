@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService, MOCK_USER_ID } from '../prisma.service';
+import { PrismaService } from '../prisma.service';
 
 export interface CreatePageDTO {
   title?: string;
@@ -33,11 +33,12 @@ export interface ReorderBlocksDTO {
 export class PagesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // ─── Pages ───
-  async createPage(dto: CreatePageDTO) {
+  // ─── Pages ─────────────────────────────────────────────────────
+
+  async createPage(userId: string, dto: CreatePageDTO) {
     const page = await this.prisma.page.create({
       data: {
-        userId: MOCK_USER_ID,
+        userId,
         title: dto.title || 'Sem título',
         parentId: dto.parentId || null,
         icon: dto.icon || null,
@@ -47,18 +48,18 @@ export class PagesService {
     return this.formatPage(page);
   }
 
-  async getPages() {
+  async getPages(userId: string) {
     const pages = await this.prisma.page.findMany({
-      where: { userId: MOCK_USER_ID },
+      where: { userId },
       include: { children: true },
       orderBy: { createdAt: 'desc' },
     });
     return pages.map(p => this.formatPage(p));
   }
 
-  async getPage(id: string) {
-    const page = await this.prisma.page.findUnique({
-      where: { id },
+  async getPage(userId: string, id: string) {
+    const page = await this.prisma.page.findFirst({
+      where: { id, userId },
       include: {
         blocks: { orderBy: { order: 'asc' } },
         children: true,
@@ -68,7 +69,8 @@ export class PagesService {
     return this.formatPage(page);
   }
 
-  async updatePage(id: string, dto: UpdatePageDTO) {
+  async updatePage(userId: string, id: string, dto: UpdatePageDTO) {
+    await this.getPage(userId, id); // ownership
     const page = await this.prisma.page.update({
       where: { id },
       data: {
@@ -81,14 +83,16 @@ export class PagesService {
     return this.formatPage(page);
   }
 
-  async deletePage(id: string) {
-    await this.getPage(id);
+  async deletePage(userId: string, id: string) {
+    await this.getPage(userId, id); // ownership
     await this.prisma.page.delete({ where: { id } });
   }
 
-  // ─── Blocks ───
-  async createBlock(pageId: string, dto: CreateBlockDTO) {
-    const order = dto.order ?? await this.getNextOrder(pageId);
+  // ─── Blocks ────────────────────────────────────────────────────
+
+  async createBlock(userId: string, pageId: string, dto: CreateBlockDTO) {
+    await this.getPage(userId, pageId); // ownership
+    const order = dto.order ?? await this.getNextOrder(userId, pageId);
     const block = await this.prisma.block.create({
       data: {
         pageId,
@@ -100,8 +104,13 @@ export class PagesService {
     return this.formatBlock(block);
   }
 
-  async updateBlock(id: string, dto: UpdateBlockDTO) {
-    const block = await this.prisma.block.update({
+  async updateBlock(userId: string, id: string, dto: UpdateBlockDTO) {
+    // Valida ownership via pageId
+    const block = await this.prisma.block.findUnique({ where: { id }, include: { page: true } });
+    if (!block) throw new NotFoundException(`Block ${id} not found`);
+    if (block.page.userId !== userId) throw new NotFoundException(`Block ${id} not found`);
+
+    const updated = await this.prisma.block.update({
       where: { id },
       data: {
         ...(dto.type !== undefined && { type: dto.type }),
@@ -109,14 +118,30 @@ export class PagesService {
         ...(dto.order !== undefined && { order: dto.order }),
       },
     });
-    return this.formatBlock(block);
+    return this.formatBlock(updated);
   }
 
-  async deleteBlock(id: string) {
+  async deleteBlock(userId: string, id: string) {
+    const block = await this.prisma.block.findUnique({ where: { id }, include: { page: true } });
+    if (!block) throw new NotFoundException(`Block ${id} not found`);
+    if (block.page.userId !== userId) throw new NotFoundException(`Block ${id} not found`);
     await this.prisma.block.delete({ where: { id } });
   }
 
-  async reorderBlocks(dto: ReorderBlocksDTO) {
+  async reorderBlocks(userId: string, dto: ReorderBlocksDTO) {
+    // Valida ownership de todos os blocos
+    const ids = dto.blocks.map(b => b.id);
+    const blocks = await this.prisma.block.findMany({
+      where: { id: { in: ids } },
+      include: { page: true },
+    });
+
+    for (const block of blocks) {
+      if (block.page.userId !== userId) {
+        throw new NotFoundException(`Block ${block.id} not found`);
+      }
+    }
+
     const updates = dto.blocks.map(b =>
       this.prisma.block.update({
         where: { id: b.id },
@@ -127,7 +152,9 @@ export class PagesService {
     return { success: true };
   }
 
-  private async getNextOrder(pageId: string): Promise<number> {
+  // ─── Helpers ──────────────────────────────────────────────────
+
+  private async getNextOrder(userId: string, pageId: string): Promise<number> {
     const last = await this.prisma.block.findFirst({
       where: { pageId },
       orderBy: { order: 'desc' },

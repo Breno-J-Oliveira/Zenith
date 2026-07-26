@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import { QuickInput } from '../../components/ai/QuickInput';
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
-
-const API = 'http://localhost:3002';
+import { apiGet } from '@/lib/api';
 
 const QUOTES = [
   { text: "O sucesso é a soma de pequenos esforços repetidos dia após dia.", author: "Robert Collier" },
@@ -49,15 +48,11 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [goalsRes, tasksRes, routinesRes] = await Promise.all([
-          fetch(`${API}/goals`),
-          fetch(`${API}/tasks`),
-          fetch(`${API}/routines`),
+        const [goals, tasks, routines] = await Promise.all([
+          apiGet<any[]>('/goals'),
+          apiGet<any[]>('/tasks'),
+          apiGet<any[]>('/routines'),
         ]);
-
-        const goals = await goalsRes.json();
-        const tasks = await tasksRes.json();
-        const routines = await routinesRes.json();
 
         // Metas ativas
         const goalsArray = Array.isArray(goals) ? goals : [];

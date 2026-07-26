@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import Link from 'next/link';
-
-const API = 'http://localhost:3002';
+import { apiGet, apiPost } from '@/lib/api';
 
 interface PageItem {
   id: string;
@@ -18,12 +18,19 @@ interface PageItem {
 }
 
 export default function PaginasPage() {
+  const searchParams = useSearchParams();
   const [pages, setPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Suporta ?new=true vindo do Command Palette
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      createPage();
+    }
+  }, [searchParams]);
+
   const fetchPages = () => {
-    fetch(`${API}/pages`)
-      .then(r => r.json())
+    apiGet<any[]>('/pages')
       .then(data => { setPages(Array.isArray(data) ? data : []); setLoading(false); })
       .catch(() => setLoading(false));
   };
@@ -31,12 +38,7 @@ export default function PaginasPage() {
   useEffect(() => { fetchPages(); }, []);
 
   const createPage = async () => {
-    const res = await fetch(`${API}/pages`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: 'Nova Página' }),
-    });
-    const page = await res.json();
+    const page = await apiPost<any>('/pages', { title: 'Nova Página' });
     window.location.href = `/paginas/${page.id}`;
   };
 

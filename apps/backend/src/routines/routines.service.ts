@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService, MOCK_USER_ID } from '../prisma.service';
+import { PrismaService } from '../prisma.service';
 import {
   Routine, CreateRoutineDTO, UpdateRoutineDTO,
   RoutineFrequency, Task, TaskStatus,
@@ -9,10 +9,10 @@ import {
 export class RoutinesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateRoutineDTO): Promise<Routine> {
+  async create(userId: string, dto: CreateRoutineDTO): Promise<Routine> {
     const record = await this.prisma.routine.create({
       data: {
-        userId: MOCK_USER_ID,
+        userId,
         title: dto.title,
         frequency: (dto.frequency || 'daily') as string,
         time: dto.time,
@@ -24,10 +24,10 @@ export class RoutinesService {
     return this.toRoutine(record);
   }
 
-  async findAll(filter?: { active?: boolean }): Promise<Routine[]> {
+  async findAll(userId: string, filter?: { active?: boolean }): Promise<Routine[]> {
     const records = await this.prisma.routine.findMany({
       where: {
-        userId: MOCK_USER_ID,
+        userId,
         ...(filter?.active !== undefined && { active: filter.active }),
       },
       orderBy: { createdAt: 'desc' },
@@ -35,13 +35,14 @@ export class RoutinesService {
     return records.map(r => this.toRoutine(r));
   }
 
-  async findOne(id: string): Promise<Routine> {
-    const record = await this.prisma.routine.findUnique({ where: { id } });
+  async findOne(userId: string, id: string): Promise<Routine> {
+    const record = await this.prisma.routine.findFirst({ where: { id, userId } });
     if (!record) throw new NotFoundException(`Routine ${id} not found`);
     return this.toRoutine(record);
   }
 
-  async update(id: string, dto: UpdateRoutineDTO): Promise<Routine> {
+  async update(userId: string, id: string, dto: UpdateRoutineDTO): Promise<Routine> {
+    await this.findOne(userId, id); // ownership
     const record = await this.prisma.routine.update({
       where: { id },
       data: {
@@ -56,14 +57,14 @@ export class RoutinesService {
     return this.toRoutine(record);
   }
 
-  async remove(id: string): Promise<void> {
-    await this.findOne(id);
-    await this.prisma.task.deleteMany({ where: { routineId: id } });
+  async remove(userId: string, id: string): Promise<void> {
+    await this.findOne(userId, id); // ownership
+    await this.prisma.task.deleteMany({ where: { userId, routineId: id } });
     await this.prisma.routine.delete({ where: { id } });
   }
 
-  async generateTasks(routineId: string, days: number = 7): Promise<Task[]> {
-    const routine = await this.findOne(routineId);
+  async generateTasks(userId: string, routineId: string, days: number = 7): Promise<Task[]> {
+    const routine = await this.findOne(userId, routineId); // ownership
     const tasks: Task[] = [];
     const now = new Date();
 
@@ -84,13 +85,13 @@ export class RoutinesService {
 
       if (shouldGenerate) {
         const existing = await this.prisma.task.findFirst({
-          where: { routineId: routine.id, date: dateStr },
+          where: { userId, routineId: routine.id, date: dateStr },
         });
         if (existing) continue;
 
         const record = await this.prisma.task.create({
           data: {
-            userId: MOCK_USER_ID,
+            userId,
             routineId: routine.id,
             title: routine.title,
             date: dateStr,
@@ -107,23 +108,27 @@ export class RoutinesService {
     return tasks;
   }
 
-  async getGeneratedTasks(): Promise<Task[]> {
+  async getGeneratedTasks(userId: string): Promise<Task[]> {
     const records = await this.prisma.task.findMany({
-      where: { userId: MOCK_USER_ID, routineId: { not: null } },
+      where: { userId, routineId: { not: null } },
       orderBy: { date: 'asc' },
     });
     return records.map(r => this.toRoutineTask(r));
   }
 
-  async getTasksForDate(date: string): Promise<Task[]> {
+  async getTasksForDate(userId: string, date: string): Promise<Task[]> {
     const records = await this.prisma.task.findMany({
-      where: { userId: MOCK_USER_ID, routineId: { not: null }, date },
+      where: { userId, routineId: { not: null }, date },
       orderBy: { time: 'asc' },
     });
     return records.map(r => this.toRoutineTask(r));
   }
 
-  async updateGeneratedTask(id: string, updates: Partial<Task> & { time?: string }): Promise<Task | null> {
+  async updateGeneratedTask(userId: string, id: string, updates: Partial<Task> & { time?: string }): Promise<Task | null> {
+    // Valida ownership
+    const existing = await this.prisma.task.findFirst({ where: { id, userId } });
+    if (!existing) throw new NotFoundException(`Task ${id} not found`);
+
     const record = await this.prisma.task.update({
       where: { id },
       data: {
@@ -156,8 +161,8 @@ export class RoutinesService {
       status: r.status as TaskStatus,
       completed: r.completed,
       createdAt: r.createdAt.toISOString(),
-      ...((r as any).routineId && { routineId: (r as any).routineId }),
-      ...((r as any).time && { time: (r as any).time, duration: (r as any).duration }),
+      ...(r.routineId && { routineId: r.routineId }),
+      ...(r.time && { time: r.time, duration: r.duration }),
     } as Task & { time?: string; duration?: number; routineId?: string };
   }
 }

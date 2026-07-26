@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-
-const API = 'http://localhost:3002';
+import { API, apiGet, apiPost, apiDelete } from '@/lib/api';
 
 interface Message {
   id: string;
@@ -43,8 +42,7 @@ export function ChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 
   const fetchThreads = async () => {
     try {
-      const res = await fetch(`${API}/chat/threads`);
-      const data = await res.json();
+      const data = await apiGet<any[]>('/chat/threads');
       setThreads(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Erro ao carregar threads:', err);
@@ -53,12 +51,7 @@ export function ChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 
   const createThread = async () => {
     try {
-      const res = await fetch(`${API}/chat/threads`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Nova conversa' }),
-      });
-      const thread = await res.json();
+      const thread = await apiPost<any>('/chat/threads', { title: 'Nova conversa' });
       setActiveThread({ ...thread, messages: [], _count: { messages: 0 } });
       setShowThreads(false);
       fetchThreads();
@@ -69,8 +62,7 @@ export function ChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
 
   const selectThread = async (thread: Thread) => {
     try {
-      const res = await fetch(`${API}/chat/threads/${thread.id}`);
-      const data = await res.json();
+      const data = await apiGet<any>(`/chat/threads/${thread.id}`);
       setActiveThread(data);
       setShowThreads(false);
     } catch (err) {
@@ -81,9 +73,9 @@ export function ChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
   const deleteThread = async (threadId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Excluir esta conversa?')) return;
-    
+
     try {
-      await fetch(`${API}/chat/threads/${threadId}`, { method: 'DELETE' });
+      await apiDelete(`/chat/threads/${threadId}`);
       if (activeThread?.id === threadId) {
         setActiveThread(null);
         setShowThreads(true);
@@ -118,12 +110,7 @@ export function ChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
     } : null);
 
     try {
-      const res = await fetch(`${API}/chat/threads/${activeThread.id}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content }),
-      });
-      const data = await res.json();
+      const data = await apiPost<any>(`/chat/threads/${activeThread.id}/messages`, { content });
 
       setActiveThread(prev => prev ? {
         ...prev,

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService, MOCK_USER_ID } from '../prisma.service';
+import { PrismaService } from '../prisma.service';
 import {
   Goal, Milestone, Task,
   CreateGoalDTO, UpdateGoalDTO, CreateMilestoneDTO,
@@ -10,10 +10,10 @@ import {
 export class GoalsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateGoalDTO): Promise<Goal> {
+  async create(userId: string, dto: CreateGoalDTO): Promise<Goal> {
     const record = await this.prisma.goal.create({
       data: {
-        userId: MOCK_USER_ID,
+        userId,
         title: dto.title,
         description: dto.description,
         category: (dto.category || 'pessoal') as string,
@@ -26,10 +26,10 @@ export class GoalsService {
     return this.toGoal(record);
   }
 
-  async findAll(filter?: { status?: GoalStatus; category?: GoalCategory }): Promise<Goal[]> {
+  async findAll(userId: string, filter?: { status?: GoalStatus; category?: GoalCategory }): Promise<Goal[]> {
     const records = await this.prisma.goal.findMany({
       where: {
-        userId: MOCK_USER_ID,
+        userId,
         ...(filter?.status && { status: filter.status }),
         ...(filter?.category && { category: filter.category }),
       },
@@ -39,16 +39,19 @@ export class GoalsService {
     return records.map(r => this.toGoal(r));
   }
 
-  async findOne(id: string): Promise<Goal> {
-    const record = await this.prisma.goal.findUnique({
-      where: { id },
+  async findOne(userId: string, id: string): Promise<Goal> {
+    const record = await this.prisma.goal.findFirst({
+      where: { id, userId },
       include: { milestones: true, tasks: true },
     });
     if (!record) throw new NotFoundException(`Goal ${id} not found`);
     return this.toGoal(record);
   }
 
-  async update(id: string, dto: UpdateGoalDTO): Promise<Goal> {
+  async update(userId: string, id: string, dto: UpdateGoalDTO): Promise<Goal> {
+    // Confirma ownership antes de atualizar
+    await this.findOne(userId, id);
+
     const record = await this.prisma.goal.update({
       where: { id },
       data: {
@@ -64,20 +67,21 @@ export class GoalsService {
     return this.toGoal(record);
   }
 
-  async remove(id: string): Promise<void> {
-    await this.findOne(id);
+  async remove(userId: string, id: string): Promise<void> {
+    await this.findOne(userId, id); // verifica ownership
     await this.prisma.goal.delete({ where: { id } });
   }
 
-  async getProgress(goalId: string): Promise<number> {
-    const goal = await this.findOne(goalId);
+  async getProgress(userId: string, goalId: string): Promise<number> {
+    const goal = await this.findOne(userId, goalId);
     const items: { completed: boolean }[] = [...goal.milestones, ...goal.tasks];
     if (items.length === 0) return 0;
     const done = items.filter(i => i.completed).length;
     return Math.round((done / items.length) * 100);
   }
 
-  async addMilestone(goalId: string, dto: CreateMilestoneDTO): Promise<Milestone> {
+  async addMilestone(userId: string, goalId: string, dto: CreateMilestoneDTO): Promise<Milestone> {
+    await this.findOne(userId, goalId); // ownership
     const record = await this.prisma.milestone.create({
       data: { goalId, title: dto.title, deadline: dto.deadline },
     });
@@ -85,9 +89,11 @@ export class GoalsService {
     return this.toMilestone(record);
   }
 
-  async toggleMilestone(goalId: string, milestoneId: string): Promise<Milestone> {
+  async toggleMilestone(userId: string, goalId: string, milestoneId: string): Promise<Milestone> {
+    await this.findOne(userId, goalId); // ownership
     const ms = await this.prisma.milestone.findUnique({ where: { id: milestoneId } });
     if (!ms || ms.goalId !== goalId) throw new NotFoundException(`Milestone ${milestoneId} not found in goal ${goalId}`);
+
     const updated = await this.prisma.milestone.update({
       where: { id: milestoneId },
       data: { completed: !ms.completed },
@@ -96,26 +102,28 @@ export class GoalsService {
     return this.toMilestone(updated);
   }
 
-  async removeMilestone(goalId: string, milestoneId: string): Promise<void> {
+  async removeMilestone(userId: string, goalId: string, milestoneId: string): Promise<void> {
+    await this.findOne(userId, goalId); // ownership
     const ms = await this.prisma.milestone.findUnique({ where: { id: milestoneId } });
     if (!ms || ms.goalId !== goalId) throw new NotFoundException(`Milestone ${milestoneId} not found in goal ${goalId}`);
+
     await this.prisma.milestone.delete({ where: { id: milestoneId } });
     await this.prisma.goal.update({ where: { id: goalId }, data: { updatedAt: new Date() } });
   }
 
-  async getTasks(): Promise<Task[]> {
+  async getTasks(userId: string): Promise<Task[]> {
     const records = await this.prisma.task.findMany({
-      where: { userId: MOCK_USER_ID, goalId: { not: null } },
+      where: { userId, goalId: { not: null } },
       orderBy: { createdAt: 'desc' },
     });
     return records.map(r => this.toTask(r));
   }
 
-  async addTask(task: Task): Promise<void> {
+  async addTask(userId: string, task: Task): Promise<void> {
     await this.prisma.task.create({
       data: {
         id: task.id,
-        userId: MOCK_USER_ID,
+        userId,
         goalId: task.goalId || null,
         milestoneId: task.milestoneId || null,
         title: task.title,
@@ -127,13 +135,14 @@ export class GoalsService {
     });
   }
 
-  async findTask(id: string): Promise<Task> {
-    const record = await this.prisma.task.findUnique({ where: { id } });
+  async findTask(userId: string, id: string): Promise<Task> {
+    const record = await this.prisma.task.findFirst({ where: { id, userId } });
     if (!record) throw new NotFoundException(`Task ${id} not found`);
     return this.toTask(record);
   }
 
-  async updateTask(id: string, dto: Partial<Task>): Promise<Task> {
+  async updateTask(userId: string, id: string, dto: Partial<Task>): Promise<Task> {
+    await this.findTask(userId, id); // ownership
     const record = await this.prisma.task.update({
       where: { id },
       data: {
@@ -147,7 +156,8 @@ export class GoalsService {
     return this.toTask(record);
   }
 
-  async removeTask(id: string): Promise<void> {
+  async removeTask(userId: string, id: string): Promise<void> {
+    await this.findTask(userId, id); // ownership
     await this.prisma.task.delete({ where: { id } });
   }
 

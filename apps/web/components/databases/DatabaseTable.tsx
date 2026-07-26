@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-
-const API = 'http://localhost:3002';
+import { apiPatch, apiPost, apiDelete } from '@/lib/api';
 
 interface Property {
   id: string;
@@ -63,10 +62,8 @@ export function DatabaseTable({ database, onUpdate }: DatabaseTableProps) {
       const values = JSON.parse(row.values);
       values[editingCell.propId] = editValue;
 
-      await fetch(`${API}/databases/rows/${editingCell.rowId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: JSON.stringify(values) }),
+      await apiPatch(`/databases/rows/${editingCell.rowId}`, {
+        values: JSON.stringify(values),
       });
 
       onUpdate();
@@ -94,10 +91,8 @@ export function DatabaseTable({ database, onUpdate }: DatabaseTableProps) {
         initialValues[prop.id] = '';
       });
 
-      await fetch(`${API}/databases/${database.id}/rows`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: JSON.stringify(initialValues) }),
+      await apiPost(`/databases/${database.id}/rows`, {
+        values: JSON.stringify(initialValues),
       });
 
       onUpdate();
@@ -109,7 +104,7 @@ export function DatabaseTable({ database, onUpdate }: DatabaseTableProps) {
   const handleDeleteRow = async (rowId: string) => {
     if (!confirm('Excluir este item?')) return;
     try {
-      await fetch(`${API}/databases/rows/${rowId}`, { method: 'DELETE' });
+      await apiDelete(`/databases/rows/${rowId}`);
       onUpdate();
     } catch (err) {
       console.error('Erro ao excluir linha:', err);

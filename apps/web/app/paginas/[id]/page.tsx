@@ -13,8 +13,7 @@ import {
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import Link from 'next/link';
-
-const API = 'http://localhost:3002';
+import { apiGet, apiPatch, apiPost, apiDelete } from '@/lib/api';
 
 interface BlockData {
   id: string;
@@ -52,8 +51,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
   );
 
   const fetchPage = useCallback(() => {
-    fetch(`${API}/pages/${params.id}`)
-      .then(r => r.json())
+    apiGet<any>(`/pages/${params.id}`)
       .then(data => {
         setPage(data);
         setTitle(data.title);
@@ -66,11 +64,7 @@ export default function PageEditor({ params }: { params: { id: string } }) {
 
   const updateTitle = async () => {
     if (!page || title === page.title) return;
-    await fetch(`${API}/pages/${params.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title }),
-    });
+    await apiPatch(`/pages/${params.id}`, { title });
     setPage({ ...page, title });
   };
 
@@ -85,26 +79,20 @@ export default function PageEditor({ params }: { params: { id: string } }) {
       divider: {},
     };
 
-    const res = await fetch(`${API}/pages/${params.id}/blocks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type, content: defaultContent[type] || {} }),
+    const newBlock = await apiPost<any>(`/pages/${params.id}/blocks`, {
+      type,
+      content: defaultContent[type] || {},
     });
-    const newBlock = await res.json();
     setPage(prev => prev ? { ...prev, blocks: [...prev.blocks, newBlock] } : prev);
     setShowAddMenu(false);
   };
 
   const updateBlock = async (id: string, content: any) => {
-    await fetch(`${API}/pages/blocks/${id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    });
+    await apiPatch(`/pages/blocks/${id}`, { content });
   };
 
   const deleteBlock = async (id: string) => {
-    await fetch(`${API}/pages/blocks/${id}`, { method: 'DELETE' });
+    await apiDelete(`/pages/blocks/${id}`);
     setPage(prev => prev ? { ...prev, blocks: prev.blocks.filter(b => b.id !== id) } : prev);
   };
 
@@ -118,12 +106,8 @@ export default function PageEditor({ params }: { params: { id: string } }) {
     const newBlocks = arrayMove(page.blocks, oldIndex, newIndex);
     setPage({ ...page, blocks: newBlocks });
 
-    await fetch(`${API}/pages/blocks/reorder`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        blocks: newBlocks.map((b, i) => ({ id: b.id, order: i })),
-      }),
+    await apiPatch('/pages/blocks/reorder', {
+      blocks: newBlocks.map((b, i) => ({ id: b.id, order: i })),
     });
   };
 

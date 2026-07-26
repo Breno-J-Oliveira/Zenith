@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import { DatabaseTable } from '../../components/databases/DatabaseTable';
 import { DatabaseGallery } from '../../components/databases/DatabaseGallery';
 import { CreateDatabaseModal } from '../../components/databases/CreateDatabaseModal';
-
-const API = 'http://localhost:3002';
+import { apiGet, apiPost, apiDelete } from '@/lib/api';
 
 interface Row {
   id: string;
@@ -51,8 +51,7 @@ export default function DatabasesPage() {
 
   const fetchDatabases = async () => {
     try {
-      const res = await fetch(`${API}/databases`);
-      const data = await res.json();
+      const data = await apiGet<any[]>('/databases');
       setDatabases(Array.isArray(data) ? data : []);
     } catch {
       setDatabases([]);
@@ -69,9 +68,7 @@ export default function DatabasesPage() {
   const presetCount = databases.filter(db => db.isPreset).length;
 
   const handleSelectDatabase = async (db: Database) => {
-    // Busca detalhes completos com rows
-    const res = await fetch(`${API}/databases/${db.id}`);
-    const data = await res.json();
+    const data = await apiGet<any>(`/databases/${db.id}`);
     setSelectedDb(data);
   };
 
@@ -83,29 +80,14 @@ export default function DatabasesPage() {
   }) => {
     try {
       if (data.presetType) {
-        // Criar a partir de preset
-        const res = await fetch(`${API}/databases/create-from-preset/${data.presetType}`, {
-          method: 'POST',
-        });
-        const db = await res.json();
+        const db = await apiPost<any>(`/databases/create-from-preset/${data.presetType}`);
         await handleSelectDatabase(db);
       } else {
-        // Criar do zero
-        const res = await fetch(`${API}/databases`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: data.title, icon: data.icon }),
-        });
-        const db = await res.json();
+        const db = await apiPost<any>('/databases', { title: data.title, icon: data.icon });
 
-        // Adicionar propriedades
         if (data.properties) {
           for (const prop of data.properties) {
-            await fetch(`${API}/databases/${db.id}/properties`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(prop),
-            });
+            await apiPost(`/databases/${db.id}/properties`, prop);
           }
         }
 
@@ -122,7 +104,7 @@ export default function DatabasesPage() {
   const handleDeleteDatabase = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este database?')) return;
     try {
-      await fetch(`${API}/databases/${id}`, { method: 'DELETE' });
+      await apiDelete(`/databases/${id}`);
       setSelectedDb(null);
       fetchDatabases();
     } catch (err) {

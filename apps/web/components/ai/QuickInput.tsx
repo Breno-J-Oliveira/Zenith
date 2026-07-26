@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { API, apiPost } from '@/lib/api';
 
 interface QuickInputAction {
   id: string;
@@ -11,9 +12,8 @@ interface QuickInputAction {
   reorgMessage?: string;
 }
 
-const API = 'http://localhost:3002';
-
 function summarizeResult(intent: string, payload: any): string {
+  if (!payload) return 'Não entendi. Tente: "gastei 25 no pastel" ou "reunião dia 23 das 14h às 16h"';
   switch (intent) {
     case 'LOG_EXPENSE':
       return `Gasto registrado: R$ ${payload.amount} · ${payload.category}`;
@@ -44,12 +44,7 @@ export function QuickInput() {
 
     setLoading(true);
     try {
-      const res = await fetch(`${API}/ai/parse`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-      const data = await res.json();
+      const data = await apiPost<any>('/ai/parse', { text });
       const summary = summarizeResult(data.intent, data.payload);
 
       let reorgMessage: string | undefined;

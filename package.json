@@ -7,6 +7,9 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "dev:auth": "npm run start:dev --workspace=apps/auth-service",
+    "dev:backend": "npm run start:dev --workspace=apps/backend",
+    "dev:web": "npm run dev --workspace=apps/web",
     "build": "turbo run build",
     "lint": "turbo run lint",
     "clean": "turbo run clean && rm -rf node_modules"

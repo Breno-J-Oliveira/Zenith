@@ -5,8 +5,7 @@ import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-
-const API = 'http://localhost:3002';
+import { apiGet, apiPatch } from '@/lib/api';
 
 interface CalendarEvent {
   id: string;
@@ -36,8 +35,7 @@ export function CalendarView({ onReorgMessage }: CalendarViewProps) {
     try {
       const from = start.split('T')[0];
       const to = end.split('T')[0];
-      const res = await fetch(`${API}/calendar?from=${from}&to=${to}`);
-      const data = await res.json();
+      const data = await apiGet<any[]>(`/calendar?from=${from}&to=${to}`);
       setEvents(data);
     } catch {
       setEvents([]);
@@ -59,12 +57,7 @@ export function CalendarView({ onReorgMessage }: CalendarViewProps) {
     const newEnd = event.end ? event.end.toISOString() : undefined;
 
     try {
-      const res = await fetch(`${API}/calendar/reschedule`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ eventId, type, newStart, newEnd }),
-      });
-      const data = await res.json();
+      const data = await apiPatch<any>('/calendar/reschedule', { eventId, type, newStart, newEnd });
 
       if (data.moved && data.moved.length > 0 && onReorgMessage) {
         onReorgMessage(data.message);

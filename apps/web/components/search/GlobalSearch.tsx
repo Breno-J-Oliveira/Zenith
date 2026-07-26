@@ -2,8 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-
-const API = 'http://localhost:3002';
+import { API, apiGet } from '@/lib/api';
 
 interface SearchResult {
   type: 'goal' | 'task' | 'routine' | 'page' | 'database';
@@ -55,19 +54,13 @@ export function GlobalSearch({ isOpen, onClose }: { isOpen: boolean; onClose: ()
     const debounce = setTimeout(async () => {
       setLoading(true);
       try {
-        const [goalsRes, tasksRes, routinesRes, pagesRes, databasesRes] = await Promise.all([
-          fetch(`${API}/goals`),
-          fetch(`${API}/tasks`),
-          fetch(`${API}/routines`),
-          fetch(`${API}/pages`),
-          fetch(`${API}/databases`),
+        const [goals, tasks, routines, pages, databases] = await Promise.all([
+          apiGet<any[]>('/goals'),
+          apiGet<any[]>('/tasks'),
+          apiGet<any[]>('/routines'),
+          apiGet<any[]>('/pages'),
+          apiGet<any[]>('/databases'),
         ]);
-
-        const goals = await goalsRes.json();
-        const tasks = await tasksRes.json();
-        const routines = await routinesRes.json();
-        const pages = await pagesRes.json();
-        const databases = await databasesRes.json();
 
         const q = query.toLowerCase();
         const searchResults: SearchResult[] = [];

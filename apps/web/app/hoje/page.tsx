@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import { EventBadge } from '../../components/calendar/EventBadge';
-
-const API = 'http://localhost:3002';
+import { apiGet, apiPatch } from '@/lib/api';
 
 interface TodayItem {
   id: string;
@@ -21,23 +21,24 @@ interface Briefing {
 }
 
 export default function HojePage() {
+  const searchParams = useSearchParams();
+  const showNewTaskModal = searchParams.get('new') === 'true';
+
   const [items, setItems] = useState<TodayItem[]>([]);
   const [briefing, setBriefing] = useState<Briefing | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'task' | 'routine' | 'appointment'>('all');
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [creatingTask, setCreatingTask] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const today = new Date().toISOString().split('T')[0];
-      const from = today;
-      const to = today;
-      const [eventsRes, briefingRes] = await Promise.all([
-        fetch(`${API}/calendar?from=${from}&to=${to}`),
-        fetch(`${API}/ai/briefing`),
+      const [events, briefingData] = await Promise.all([
+        apiGet<any[]>(`/calendar?from=${today}&to=${today}`),
+        apiGet<any>('/ai/briefing'),
       ]);
-      const events = await eventsRes.json();
-      const briefingData = await briefingRes.json();
 
       const todayItems: TodayItem[] = events.map((e: any) => ({
         id: e.id,
@@ -62,7 +63,7 @@ export default function HojePage() {
   const handleToggle = async (item: TodayItem) => {
     if (item.type === 'routine' || item.type === 'task') {
       try {
-        await fetch(`${API}/tasks/${item.sourceId}/toggle`, { method: 'PATCH' });
+        await apiPatch(`/tasks/${item.sourceId}/toggle`);
         fetchData();
       } catch { /* ignore */ }
     }

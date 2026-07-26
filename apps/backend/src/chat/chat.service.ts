@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma.service';
+import { PrismaService, MOCK_USER_ID } from '../prisma.service';
 import { GoalsService } from '../goals/goals.service';
 import { TasksService } from '../tasks/tasks.service';
 import { RoutinesService } from '../routines/routines.service';
 import { DatabasesService } from '../databases/databases.service';
 
-const MOCK_USER_ID = 'mock-user-id';
+// MOCK_USER_ID importado de prisma.service.ts para garantir consistência.
 
 interface ToolCall {
   name: string;

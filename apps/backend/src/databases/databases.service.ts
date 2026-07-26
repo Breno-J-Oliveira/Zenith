@@ -1,36 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
-// Mock user ID (será substituído por auth real na Fase 13)
-const MOCK_USER_ID = 'mock-user-id';
-
 @Injectable()
 export class DatabasesService {
   constructor(private prisma: PrismaService) {}
 
-  // Garante que o usuário mock existe no banco
-  private async ensureMockUser() {
-    const user = await this.prisma.user.findUnique({
-      where: { id: MOCK_USER_ID },
-    });
-    if (!user) {
-      await this.prisma.user.create({
-        data: {
-          id: MOCK_USER_ID,
-          email: 'mock-user@zenith.app',
-          name: 'Mock User',
-        },
-      });
-    }
-    return MOCK_USER_ID;
-  }
-
   // ─── DATABASE ──────────────────────────────────────────────
 
-  async findAll(pageId?: string) {
-    const where: any = { userId: MOCK_USER_ID };
+  async findAll(userId: string, pageId?: string) {
+    const where: any = { userId };
     if (pageId) where.pageId = pageId;
-
     return this.prisma.database.findMany({
       where,
       include: {
@@ -42,32 +21,30 @@ export class DatabasesService {
     });
   }
 
-  async findOne(id: string) {
+  async findOne(userId: string, id: string) {
     const database = await this.prisma.database.findFirst({
-      where: { id, userId: MOCK_USER_ID },
+      where: { id, userId },
       include: {
         properties: { orderBy: { order: 'asc' } },
         rows: { orderBy: { order: 'asc' } },
         views: true,
       },
     });
-
     if (!database) throw new NotFoundException('Database não encontrado');
     return database;
   }
 
-  async create(data: {
+  async create(userId: string, data: {
     title: string;
     icon?: string;
     pageId?: string;
     isPreset?: boolean;
     presetType?: string;
   }) {
-    await this.ensureMockUser();
     return this.prisma.database.create({
       data: {
         ...data,
-        userId: MOCK_USER_ID,
+        userId,
         // Cria view padrão "Tabela"
         views: {
           create: {
@@ -84,29 +61,28 @@ export class DatabasesService {
     });
   }
 
-  async update(id: string, data: { title?: string; icon?: string }) {
-    await this.findOne(id); // Verifica se existe
+  async update(userId: string, id: string, data: { title?: string; icon?: string }) {
+    await this.findOne(userId, id); // ownership
     return this.prisma.database.update({
       where: { id },
       data,
     });
   }
 
-  async remove(id: string) {
-    await this.findOne(id);
+  async remove(userId: string, id: string) {
+    await this.findOne(userId, id);
     return this.prisma.database.delete({ where: { id } });
   }
 
   // ─── PROPERTY ──────────────────────────────────────────────
 
-  async addProperty(databaseId: string, data: {
+  async addProperty(userId: string, databaseId: string, data: {
     name: string;
     type: string;
     options?: string;
   }) {
-    await this.findOne(databaseId);
+    await this.findOne(userId, databaseId);
 
-    // Pega o próximo order
     const lastProperty = await this.prisma.property.findFirst({
       where: { databaseId },
       orderBy: { order: 'desc' },
@@ -121,29 +97,28 @@ export class DatabasesService {
     });
   }
 
-  async updateProperty(propertyId: string, data: {
+  async updateProperty(userId: string, propertyId: string, data: {
     name?: string;
     type?: string;
     options?: string;
     order?: number;
   }) {
+    await this.assertPropertyOwner(userId, propertyId);
     return this.prisma.property.update({
       where: { id: propertyId },
       data,
     });
   }
 
-  async removeProperty(propertyId: string) {
+  async removeProperty(userId: string, propertyId: string) {
+    await this.assertPropertyOwner(userId, propertyId);
     return this.prisma.property.delete({ where: { id: propertyId } });
   }
 
-  // ─── ROW ───────────────────────────────────────────────────
+  // ─── ROW ────────────────────────────────────────────────────
 
-  async addRow(databaseId: string, data: {
-    values: string;
-    coverImage?: string;
-  }) {
-    await this.findOne(databaseId);
+  async addRow(userId: string, databaseId: string, data: { values: string; coverImage?: string }) {
+    await this.findOne(userId, databaseId);
 
     const lastRow = await this.prisma.row.findFirst({
       where: { databaseId },
@@ -159,29 +134,31 @@ export class DatabasesService {
     });
   }
 
-  async updateRow(rowId: string, data: {
+  async updateRow(userId: string, rowId: string, data: {
     values?: string;
     coverImage?: string;
     order?: number;
   }) {
+    await this.assertRowOwner(userId, rowId);
     return this.prisma.row.update({
       where: { id: rowId },
       data,
     });
   }
 
-  async removeRow(rowId: string) {
+  async removeRow(userId: string, rowId: string) {
+    await this.assertRowOwner(userId, rowId);
     return this.prisma.row.delete({ where: { id: rowId } });
   }
 
-  // ─── VIEW ──────────────────────────────────────────────────
+  // ─── VIEW ────────────────────────────────────────────────────
 
-  async addView(databaseId: string, data: {
+  async addView(userId: string, databaseId: string, data: {
     name: string;
     type: string;
     config: string;
   }) {
-    await this.findOne(databaseId);
+    await this.findOne(userId, databaseId);
 
     return this.prisma.view.create({
       data: {
@@ -191,24 +168,26 @@ export class DatabasesService {
     });
   }
 
-  async updateView(viewId: string, data: {
+  async updateView(userId: string, viewId: string, data: {
     name?: string;
     type?: string;
     config?: string;
   }) {
+    await this.assertViewOwner(userId, viewId);
     return this.prisma.view.update({
       where: { id: viewId },
       data,
     });
   }
 
-  async removeView(viewId: string) {
+  async removeView(userId: string, viewId: string) {
+    await this.assertViewOwner(userId, viewId);
     return this.prisma.view.delete({ where: { id: viewId } });
   }
 
-  // ─── PRESETS ───────────────────────────────────────────────
+  // ─── PRESETS ────────────────────────────────────────────────
 
-  async createFromPreset(presetType: string) {
+  async createFromPreset(userId: string, presetType: string) {
     const presets: Record<string, any> = {
       finance: {
         title: 'Finanças',
@@ -259,14 +238,12 @@ export class DatabasesService {
     const preset = presets[presetType];
     if (!preset) throw new NotFoundException('Preset não encontrado');
 
-    await this.ensureMockUser();
-
     // Cria o database com propriedades
     const database = await this.prisma.database.create({
       data: {
+        userId,
         title: preset.title,
         icon: preset.icon,
-        userId: MOCK_USER_ID,
         isPreset: true,
         presetType,
         views: {
@@ -289,6 +266,41 @@ export class DatabasesService {
       });
     }
 
-    return this.findOne(database.id);
+    return this.findOne(userId, database.id);
+  }
+
+  // ─── Helpers de ownership ──────────────────────────────────
+
+  private async assertPropertyOwner(userId: string, propertyId: string) {
+    const property = await this.prisma.property.findUnique({
+      where: { id: propertyId },
+      include: { database: true },
+    });
+    if (!property) throw new NotFoundException(`Property ${propertyId} não encontrada`);
+    if (property.database.userId !== userId) {
+      throw new NotFoundException(`Property ${propertyId} não encontrada`);
+    }
+  }
+
+  private async assertRowOwner(userId: string, rowId: string) {
+    const row = await this.prisma.row.findUnique({
+      where: { id: rowId },
+      include: { database: true },
+    });
+    if (!row) throw new NotFoundException(`Row ${rowId} não encontrada`);
+    if (row.database.userId !== userId) {
+      throw new NotFoundException(`Row ${rowId} não encontrada`);
+    }
+  }
+
+  private async assertViewOwner(userId: string, viewId: string) {
+    const view = await this.prisma.view.findUnique({
+      where: { id: viewId },
+      include: { database: true },
+    });
+    if (!view) throw new NotFoundException(`View ${viewId} não encontrada`);
+    if (view.database.userId !== userId) {
+      throw new NotFoundException(`View ${viewId} não encontrada`);
+    }
   }
 }

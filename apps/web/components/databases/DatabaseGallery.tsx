@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-
-const API = 'http://localhost:3002';
+import { apiPost, apiDelete } from '@/lib/api';
 
 interface Property {
   id: string;
@@ -54,10 +53,8 @@ export function DatabaseGallery({ database, onUpdate }: DatabaseGalleryProps) {
         initialValues[prop.id] = '';
       });
 
-      await fetch(`${API}/databases/${database.id}/rows`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ values: JSON.stringify(initialValues) }),
+      await apiPost(`/databases/${database.id}/rows`, {
+        values: JSON.stringify(initialValues),
       });
 
       onUpdate();
@@ -69,7 +66,7 @@ export function DatabaseGallery({ database, onUpdate }: DatabaseGalleryProps) {
   const handleDeleteRow = async (rowId: string) => {
     if (!confirm('Excluir este item?')) return;
     try {
-      await fetch(`${API}/databases/rows/${rowId}`, { method: 'DELETE' });
+      await apiDelete(`/databases/rows/${rowId}`);
       setSelectedRow(null);
       onUpdate();
     } catch (err) {

@@ -38,6 +38,9 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
     { id: 'action-new-database', label: 'Criar Novo Database', description: 'Base de dados flexível', icon: '🗃️', action: () => router.push('/databases?new=true'), category: 'Ações' },
     { id: 'action-open-chat', label: 'Abrir Chat com IA', description: 'Conversar com assistente', icon: '💬', action: () => document.querySelector('[title="Abrir chat com IA"]')?.click(), category: 'Ações' },
     { id: 'action-open-search', label: 'Abrir Busca Global', description: 'Buscar em todo o app', icon: '🔍', action: () => document.querySelector('[title="Buscar (Ctrl+K)"]')?.click(), category: 'Ações' },
+    { id: 'action-open-notifications', label: 'Abrir Notificações', description: 'Ver central de notificações', icon: '🔔', action: () => document.querySelector('[title="Notificações"]')?.click(), category: 'Ações' },
+    { id: 'action-new-appointment', label: 'Marcar Compromisso', description: 'Agendar evento com IA', icon: '📅', action: () => router.push('/calendario'), category: 'Ações' },
+
     
     // Temas
     { id: 'theme-red', label: 'Tema Vermelho', description: 'Energia e paixão', icon: '🔴', action: () => document.documentElement.setAttribute('data-theme', 'red'), category: 'Temas' },

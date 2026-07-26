@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-
-const API = 'http://localhost:3002';
+import { apiGet, apiPatch, apiDelete } from '@/lib/api';
 
 interface Notification {
   id: string;
@@ -29,72 +28,54 @@ export function NotificationPanel({ isOpen, onClose }: { isOpen: boolean; onClos
   const fetchNotifications = async () => {
     setLoading(true);
     try {
-      // Mock: gerar notificações de exemplo
-      const mockNotifications: Notification[] = [
-        {
-          id: '1',
-          title: 'Bem-vindo ao Zenith!',
-          body: 'Comece criando sua primeira meta ou rotina. Use o chat com IA para ajuda.',
-          type: 'info',
-          read: false,
-          createdAt: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          title: 'Rotina concluída',
-          body: 'Você completou a rotina "Meditar" hoje. Continue assim!',
-          type: 'success',
-          read: false,
-          relatedType: 'routine',
-          createdAt: new Date(Date.now() - 3600000).toISOString(),
-        },
-        {
-          id: '3',
-          title: 'Lembrete: Reunião',
-          body: 'Sua reunião começa em 30 minutos. Prepare seus materiais.',
-          type: 'warning',
-          read: true,
-          relatedType: 'appointment',
-          createdAt: new Date(Date.now() - 7200000).toISOString(),
-        },
-        {
-          id: '4',
-          title: 'Meta atingida',
-          body: 'Parabéns! Você completou 80% da meta "Aprender React".',
-          type: 'success',
-          read: true,
-          relatedType: 'goal',
-          createdAt: new Date(Date.now() - 86400000).toISOString(),
-        },
-        {
-          id: '5',
-          title: 'Nova atualização',
-          body: 'O Zenith foi atualizado com novas funcionalidades. Confira!',
-          type: 'info',
-          read: true,
-          createdAt: new Date(Date.now() - 172800000).toISOString(),
-        },
-      ];
-      setNotifications(mockNotifications);
+      const data = await apiGet<Notification[]>('/notifications');
+      setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Erro ao carregar notificações:', err);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
   };
 
   const markAsRead = async (id: string) => {
+    // Optimistic update
     setNotifications(prev =>
       prev.map(n => n.id === id ? { ...n, read: true } : n)
     );
+    try {
+      await apiPatch(`/notifications/${id}/read`);
+    } catch (err) {
+      console.error('Erro ao marcar como lida:', err);
+      // Reverter se falhar
+      setNotifications(prev =>
+        prev.map(n => n.id === id ? { ...n, read: false } : n)
+      );
+    }
   };
 
   const markAllAsRead = async () => {
+    // Optimistic
+    const previous = notifications;
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try {
+      await apiPatch('/notifications/read-all');
+    } catch (err) {
+      console.error('Erro ao marcar todas como lidas:', err);
+      setNotifications(previous);
+    }
   };
 
   const deleteNotification = async (id: string) => {
+    // Optimistic
+    const previous = notifications;
     setNotifications(prev => prev.filter(n => n.id !== id));
+    try {
+      await apiDelete(`/notifications/${id}`);
+    } catch (err) {
+      console.error('Erro ao excluir notificação:', err);
+      setNotifications(previous);
+    }
   };
 
   const getTypeIcon = (type: string) => {
@@ -132,7 +113,7 @@ export function NotificationPanel({ isOpen, onClose }: { isOpen: boolean; onClos
 
   if (!isOpen) return null;
 
-  const filteredNotifications = filter === 'unread' 
+  const filteredNotifications = filter === 'unread'
     ? notifications.filter(n => !n.read)
     : notifications;
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -225,7 +206,7 @@ export function NotificationPanel({ isOpen, onClose }: { isOpen: boolean; onClos
             {filteredNotifications.map(notification => (
               <div
                 key={notification.id}
-                onClick={() => markAsRead(notification.id)}
+                onClick={() => !notification.read && markAsRead(notification.id)}
                 className={`p-4 hover:bg-[var(--color-surface-2)]/30 transition-all cursor-pointer group ${
                   !notification.read ? 'bg-[var(--color-primary-subtle)]' : ''
                 }`}

@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import { GoalCard } from '../../components/goals/GoalCard';
+import { apiGet, apiPost, apiPatch, apiDelete, apiPut, API } from '@/lib/api';
 
 interface Milestone {
   id: string;
@@ -39,8 +41,6 @@ interface Goal {
   updatedAt: string;
 }
 
-const API = 'http://localhost:3002';
-
 const categoryLabels: Record<string, string> = {
   pessoal: 'Pessoal',
   trabalho: 'Trabalho',
@@ -64,6 +64,8 @@ function calcProgress(goal: Goal): number {
 }
 
 export default function MetasPage() {
+  const searchParams = useSearchParams();
+
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('');
@@ -74,14 +76,20 @@ export default function MetasPage() {
   const [newMilestone, setNewMilestone] = useState<Record<string, string>>({});
   const [newTask, setNewTask] = useState<Record<string, string>>({});
 
+  // Suporta ?new=true vindo do Command Palette
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setShowCreateForm(true);
+    }
+  }, [searchParams]);
+
   const fetchGoals = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams();
-      if (filterStatus) params.set('status', filterStatus);
-      if (filterCategory) params.set('category', filterCategory);
-      const res = await fetch(`${API}/goals?${params}`);
-      const data = await res.json();
+      const params: Record<string, string> = {};
+      if (filterStatus) params.status = filterStatus;
+      if (filterCategory) params.category = filterCategory;
+      const data = await apiGet<Goal[]>('/goals', { params });
       setGoals(data);
     } catch {
       setGoals([]);
@@ -101,7 +109,7 @@ export default function MetasPage() {
       if (newGoal.category) body.category = newGoal.category;
       if (newGoal.priority) body.priority = newGoal.priority;
       if (newGoal.deadline) body.deadline = newGoal.deadline;
-      await fetch(`${API}/goals`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      await apiPost('/goals', body);
       setNewGoal({ title: '', description: '', category: 'pessoal', priority: 'media', deadline: '' });
       setShowCreateForm(false);
       fetchGoals();
@@ -110,14 +118,14 @@ export default function MetasPage() {
 
   const handleDeleteGoal = async (id: string) => {
     try {
-      await fetch(`${API}/goals/${id}`, { method: 'DELETE' });
+      await apiDelete(`/goals/${id}`);
       fetchGoals();
     } catch { /* ignore */ }
   };
 
   const handleStatusChange = async (id: string, status: string) => {
     try {
-      await fetch(`${API}/goals/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+      await apiPut(`/goals/${id}`, { status });
       fetchGoals();
     } catch { /* ignore */ }
   };
@@ -125,7 +133,7 @@ export default function MetasPage() {
   const handleAddMilestone = async (goalId: string, title: string) => {
     if (!title?.trim()) return;
     try {
-      await fetch(`${API}/goals/${goalId}/milestones`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+      await apiPost(`/goals/${goalId}/milestones`, { title });
       setNewMilestone(prev => ({ ...prev, [goalId]: '' }));
       fetchGoals();
     } catch { /* ignore */ }
@@ -133,14 +141,14 @@ export default function MetasPage() {
 
   const handleToggleMilestone = async (goalId: string, milestoneId: string) => {
     try {
-      await fetch(`${API}/goals/${goalId}/milestones/${milestoneId}/toggle`, { method: 'PATCH' });
+      await apiPatch(`/goals/${goalId}/milestones/${milestoneId}/toggle`);
       fetchGoals();
     } catch { /* ignore */ }
   };
 
   const handleDeleteMilestone = async (goalId: string, milestoneId: string) => {
     try {
-      await fetch(`${API}/goals/${goalId}/milestones/${milestoneId}`, { method: 'DELETE' });
+      await apiDelete(`/goals/${goalId}/milestones/${milestoneId}`);
       fetchGoals();
     } catch { /* ignore */ }
   };
@@ -148,7 +156,7 @@ export default function MetasPage() {
   const handleAddTask = async (goalId: string, title: string) => {
     if (!title?.trim()) return;
     try {
-      await fetch(`${API}/tasks`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, goalId }) });
+      await apiPost('/tasks', { title, goalId });
       setNewTask(prev => ({ ...prev, [goalId]: '' }));
       fetchGoals();
     } catch { /* ignore */ }
@@ -156,14 +164,14 @@ export default function MetasPage() {
 
   const handleToggleTask = async (taskId: string) => {
     try {
-      await fetch(`${API}/tasks/${taskId}/toggle`, { method: 'PATCH' });
+      await apiPatch(`/tasks/${taskId}/toggle`);
       fetchGoals();
     } catch { /* ignore */ }
   };
 
   const handleDeleteTask = async (taskId: string) => {
     try {
-      await fetch(`${API}/tasks/${taskId}`, { method: 'DELETE' });
+      await apiDelete(`/tasks/${taskId}`);
       fetchGoals();
     } catch { /* ignore */ }
   };

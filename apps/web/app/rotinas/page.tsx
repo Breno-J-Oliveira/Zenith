@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
+import { API, apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api';
 
 interface Routine {
   id: string;
@@ -14,7 +16,7 @@ interface Routine {
   createdAt: string;
 }
 
-const API = 'http://localhost:3002';
+// API importado de '@/lib/api'
 
 const frequencyLabels: Record<string, string> = {
   daily: 'Diária',
@@ -59,8 +61,7 @@ export default function RotinasPage() {
   const fetchRoutines = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API}/routines`);
-      const data = await res.json();
+      const data = await apiGet<any[]>('/routines');
       setRoutines(data);
     } catch {
       setRoutines([]);
@@ -75,15 +76,11 @@ export default function RotinasPage() {
     e.preventDefault();
     if (!newRoutine.title.trim()) return;
     try {
-      await fetch(`${API}/routines`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: newRoutine.title,
-          frequency: newRoutine.frequency,
-          time: newRoutine.time,
-          duration: parseInt(newRoutine.duration) || 60,
-        }),
+      await apiPost('/routines', {
+        title: newRoutine.title,
+        frequency: newRoutine.frequency,
+        time: newRoutine.time,
+        duration: parseInt(newRoutine.duration) || 60,
       });
       setNewRoutine({ title: '', frequency: 'daily', time: '08:00', duration: '60' });
       setShowCreateForm(false);
@@ -93,26 +90,21 @@ export default function RotinasPage() {
 
   const handleToggle = async (id: string, active: boolean) => {
     try {
-      await fetch(`${API}/routines/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: !active }),
-      });
+      await apiPatch(`/routines/${id}`, { active: !active });
       fetchRoutines();
     } catch { /* ignore */ }
   };
 
   const handleDelete = async (id: string) => {
     try {
-      await fetch(`${API}/routines/${id}`, { method: 'DELETE' });
+      await apiDelete(`/routines/${id}`);
       fetchRoutines();
     } catch { /* ignore */ }
   };
 
   const handleGenerateTasks = async (id: string) => {
     try {
-      const res = await fetch(`${API}/routines/${id}/generate-tasks?days=7`, { method: 'POST' });
-      const tasks = await res.json();
+      const tasks = await apiPost<any[]>(`/routines/${id}/generate-tasks?days=7`);
       setGeneratedInfo(`${tasks.length} tarefa(s) gerada(s) para os próximos 7 dias`);
       setTimeout(() => setGeneratedInfo(null), 4000);
     } catch { /* ignore */ }
