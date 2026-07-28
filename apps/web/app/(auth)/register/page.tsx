@@ -23,6 +23,15 @@ export default function RegisterPage() {
     }
   }, [loading, isAuthenticated, router]);
 
+  // Validações em tempo real
+  const checks = {
+    length: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[^A-Za-z0-9]/.test(password),
+  };
+  const allValid = checks.length && checks.upper && checks.number && checks.special;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
@@ -31,8 +40,8 @@ export default function RegisterPage() {
       setLocalError('Preenche todos os campos.');
       return;
     }
-    if (password.length < 8) {
-      setLocalError('A password deve ter no mínimo 8 caracteres.');
+    if (!allValid) {
+      setLocalError('A password não cumpre todos os requisitos.');
       return;
     }
     if (password !== confirmPassword) {
@@ -42,30 +51,22 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, password, name);
+      // Se o registro retornar sem erro, redireciona para login
+      router.push('/login?registered=true');
     } catch (err) {
-      setLocalError((err as Error).message || 'Erro ao registar');
+      const msg = (err as Error).message || 'Erro ao registar';
+      // Traduzir erros comuns do NexusAuth
+      if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
+        setLocalError('Este email já está registado. Tenta fazer login.');
+      } else if (msg.includes('password') || msg.includes('Password')) {
+        setLocalError('Password não cumpre os requisitos de segurança.');
+      } else {
+        setLocalError(msg);
+      }
     } finally {
       setSubmitting(false);
     }
   };
-
-  // Força da password (visual)
-  const passwordStrength = (() => {
-    if (!password) return { score: 0, label: '', color: '' };
-    let score = 0;
-    if (password.length >= 8) score++;
-    if (/[A-Z]/.test(password)) score++;
-    if (/[0-9]/.test(password)) score++;
-    if (/[^A-Za-z0-9]/.test(password)) score++;
-    const map = [
-      { label: 'Muito fraca', color: 'bg-[var(--color-danger)]' },
-      { label: 'Fraca', color: 'bg-[var(--color-warning)]' },
-      { label: 'Razoável', color: 'bg-[var(--color-warning)]' },
-      { label: 'Boa', color: 'bg-[var(--color-success)]' },
-      { label: 'Forte', color: 'bg-[var(--color-success)]' },
-    ];
-    return { score, ...map[score] };
-  })();
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] px-4 py-12 relative overflow-hidden">
@@ -143,7 +144,7 @@ export default function RegisterPage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
+                  placeholder="Cria uma password forte"
                   required
                   autoComplete="new-password"
                   className="input w-full pr-12"
@@ -158,19 +159,21 @@ export default function RegisterPage() {
                   {showPassword ? '🙈' : '👁️'}
                 </button>
               </div>
-              {password && (
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${passwordStrength.color} transition-all duration-300`}
-                      style={{ width: `${(passwordStrength.score / 4) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-[var(--color-text-dim)] font-mono w-20 text-right">
-                    {passwordStrength.label}
-                  </span>
-                </div>
-              )}
+              {/* Requisitos de senha em tempo real */}
+              <div className="mt-2 space-y-1">
+                <p className={`text-[10px] font-mono ${checks.length ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
+                  {checks.length ? '✓' : '○'} Mínimo 8 caracteres
+                </p>
+                <p className={`text-[10px] font-mono ${checks.upper ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
+                  {checks.upper ? '✓' : '○'} Uma letra maiúscula (A-Z)
+                </p>
+                <p className={`text-[10px] font-mono ${checks.number ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
+                  {checks.number ? '✓' : '○'} Um número (0-9)
+                </p>
+                <p className={`text-[10px] font-mono ${checks.special ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
+                  {checks.special ? '✓' : '○'} Um caractere especial (!@#$%...)
+                </p>
+              </div>
             </div>
 
             <div>
@@ -206,7 +209,7 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={submitting || loading}
+              disabled={submitting || loading || !allValid}
               className="btn btn-primary w-full"
             >
               {submitting ? (
@@ -233,10 +236,6 @@ export default function RegisterPage() {
           >
             Entrar
           </Link>
-        </p>
-
-        <p className="text-center text-[10px] text-[var(--color-text-muted)] mt-6 font-mono">
-          Powered by <span className="text-[var(--color-primary)]">NexusAuth</span>
         </p>
       </div>
     </div>
