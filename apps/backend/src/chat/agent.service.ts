@@ -186,7 +186,7 @@ export class AgentService {
           },
           {
             name: 'create_database',
-            description: 'Cria um novo database (base de dados flexível tipo Notion) com propriedades customizadas.',
+            description: 'Cria um novo database vazio com propriedades customizadas. Para começar de um preset pronto (Finanças, Lista de Compras, etc.), use create_database_from_preset.',
             parameters: {
               type: 'object',
               properties: {
@@ -207,6 +207,81 @@ export class AgentService {
                 },
               },
               required: ['title'],
+            },
+          },
+          {
+            name: 'create_database_from_preset',
+            description: 'Cria um database pronto a partir de um preset. Presets disponíveis: finance (Finanças), shopping (Lista de Compras), study (Estudos), habits (Hábitos).',
+            parameters: {
+              type: 'object',
+              properties: {
+                presetType: {
+                  type: 'string',
+                  enum: ['finance', 'shopping', 'study', 'habits'],
+                  description: 'Tipo do preset',
+                },
+              },
+              required: ['presetType'],
+            },
+          },
+          {
+            name: 'add_to_database',
+            description: 'Adiciona uma linha/registro a um database existente. Use databaseTitle (mais amigável) ou databaseId. Os valores são passados como { nomeDaColuna: valor } — a IA não precisa saber o ID da coluna.',
+            parameters: {
+              type: 'object',
+              properties: {
+                databaseTitle: { type: 'string', description: 'Título do database (ex: "Finanças", "Lista de Compras")' },
+                databaseId: { type: 'string', description: 'ID do database (alternativa ao título)' },
+                values: {
+                  type: 'object',
+                  description: 'Objeto { coluna: valor } — a IA deve usar o NOME da coluna, não o ID',
+                },
+              },
+              required: ['values'],
+            },
+          },
+          {
+            name: 'log_expense',
+            description: 'Atalho para registrar um gasto no preset Finanças. Cria o preset automaticamente se não existir. Use para: "gastei X em Y", "comprei X por Y", "paguei X de Y".',
+            parameters: {
+              type: 'object',
+              properties: {
+                description: { type: 'string', description: 'Descrição do gasto (ex: "pastel", "uber", "almoço")' },
+                amount: { type: 'number', description: 'Valor em reais (ex: 25.50)' },
+                category: { type: 'string', description: 'Categoria: Alimentação, Transporte, Lazer, Saúde, Educação, Moradia, Outros' },
+                date: { type: 'string', description: 'Data do gasto (YYYY-MM-DD), opcional — default hoje' },
+              },
+              required: ['description', 'amount'],
+            },
+          },
+          {
+            name: 'get_database_rows',
+            description: 'Lista as linhas (registros) de um database. Use para responder perguntas como "quais gastos eu tive essa semana", "o que tem na minha lista de compras".',
+            parameters: {
+              type: 'object',
+              properties: {
+                databaseTitle: { type: 'string' },
+                databaseId: { type: 'string' },
+                limit: { type: 'number', description: 'Limite de linhas a retornar (default 50)' },
+              },
+            },
+          },
+          {
+            name: 'query_database',
+            description: 'Consulta um database com filtro por categoria e/ou período. Útil para perguntas como "quanto gastei com Alimentação esta semana".',
+            parameters: {
+              type: 'object',
+              properties: {
+                databaseTitle: { type: 'string' },
+                databaseId: { type: 'string' },
+                categoryColumn: { type: 'string', description: 'Nome da coluna de categoria (ex: "Categoria")' },
+                categoryValue: { type: 'string', description: 'Valor da categoria (ex: "Alimentação")' },
+                dateColumn: { type: 'string', description: 'Nome da coluna de data' },
+                dateFrom: { type: 'string', description: 'Data inicial (YYYY-MM-DD)' },
+                dateTo: { type: 'string', description: 'Data final (YYYY-MM-DD)' },
+                aggregate: { type: 'string', enum: ['sum', 'count', 'list', 'average'], description: 'Tipo de agregação: sum (somar coluna numérica), count (contar linhas), list (listar valores), average (média)' },
+                aggregateColumn: { type: 'string', description: 'Coluna numérica para somar / agregar' },
+              },
             },
           },
 
@@ -498,10 +573,133 @@ export class AgentService {
             name: p.name,
             type: p.type,
             options: p.options ? JSON.stringify(p.options) : undefined,
-            order: i,
-          });
+          } as any);
         }
         return { id: db.id, title: db.title, propertiesCount: props.length, status: 'created' };
+      }
+      case 'create_database_from_preset': {
+        const db = await this.databasesService.createFromPreset(userId, args.presetType);
+        return { id: db.id, title: db.title, icon: db.icon, propertiesCount: db.properties.length, status: 'created' };
+      }
+      case 'add_to_database': {
+        // Resolve database (por ID ou título)
+        let databaseId = args.databaseId;
+        if (!databaseId && args.databaseTitle) {
+          const db = await this.databasesService.findAll(userId);
+          const found = db.find((d) => d.title.toLowerCase() === args.databaseTitle.toLowerCase());
+          if (!found) {
+            return { error: `Database com título "${args.databaseTitle}" não encontrado. Crie-o primeiro.` };
+          }
+          databaseId = found.id;
+        }
+        if (!databaseId) return { error: 'Forneça databaseId ou databaseTitle.' };
+        const row = await this.databasesService.addRow(userId, databaseId, { values: args.values });
+        return { id: row.id, databaseId, values: args.values, status: 'row_added' };
+      }
+      case 'log_expense': {
+        // Cria preset Finanças automaticamente se não existir
+        const today = new Date().toISOString().split('T')[0];
+        const values = {
+          'Descrição': args.description,
+          'Valor': args.amount,
+          'Categoria': args.category || 'Outros',
+          'Data': args.date || today,
+          'Tipo': 'Despesa',
+        };
+        const row = await this.databasesService.addRowToPreset(userId, 'finance', values);
+        return { id: row.id, ...values, status: 'expense_logged' };
+      }
+      case 'get_database_rows': {
+        let databaseId = args.databaseId;
+        if (!databaseId && args.databaseTitle) {
+          const db = await this.databasesService.findAll(userId);
+          const found = db.find((d) => d.title.toLowerCase() === args.databaseTitle.toLowerCase());
+          if (!found) return { error: `Database "${args.databaseTitle}" não encontrado.` };
+          databaseId = found.id;
+        }
+        if (!databaseId) return { error: 'Forneça databaseId ou databaseTitle.' };
+        const db = await this.databasesService.findOne(userId, databaseId);
+        const limit = args.limit || 50;
+        // Decodifica os values JSON de cada linha
+        const decodedRows = db.rows.slice(0, limit).map((r: any) => {
+          let values: any = {};
+          try { values = JSON.parse(r.values); } catch {}
+          // Converte { propertyId: value } → { propertyName: value } para legibilidade
+          const named: Record<string, any> = {};
+          for (const prop of db.properties) {
+            named[prop.name] = values[prop.id];
+          }
+          return { id: r.id, order: r.order, values: named };
+        });
+        return {
+          databaseId,
+          title: db.title,
+          properties: db.properties.map((p: any) => ({ name: p.name, type: p.type })),
+          count: decodedRows.length,
+          totalRows: db.rows.length,
+          rows: decodedRows,
+        };
+      }
+      case 'query_database': {
+        let databaseId = args.databaseId;
+        if (!databaseId && args.databaseTitle) {
+          const db = await this.databasesService.findAll(userId);
+          const found = db.find((d) => d.title.toLowerCase() === args.databaseTitle.toLowerCase());
+          if (!found) return { error: `Database "${args.databaseTitle}" não encontrado.` };
+          databaseId = found.id;
+        }
+        if (!databaseId) return { error: 'Forneça databaseId ou databaseTitle.' };
+        const db = await this.databasesService.findOne(userId, databaseId);
+
+        // Encontra IDs das colunas pelos nomes
+        const colByName: Record<string, any> = {};
+        for (const p of db.properties) colByName[p.name] = p;
+        const catCol = args.categoryColumn ? colByName[args.categoryColumn] : null;
+        const dateCol = args.dateColumn ? colByName[args.dateColumn] : null;
+        const aggCol = args.aggregateColumn ? colByName[args.aggregateColumn] : null;
+
+        // Filtra linhas
+        let rows = db.rows;
+        const filtered: any[] = [];
+        for (const r of rows) {
+          let values: any = {};
+          try { values = JSON.parse(r.values); } catch { continue; }
+          if (catCol && args.categoryValue !== undefined && values[catCol.id] !== args.categoryValue) continue;
+          if (dateCol) {
+            const v = values[dateCol.id];
+            if (args.dateFrom && v < args.dateFrom) continue;
+            if (args.dateTo && v > args.dateTo) continue;
+          }
+          filtered.push(values);
+        }
+
+        // Agrega
+        let aggregated: any = null;
+        if (args.aggregate === 'count') {
+          aggregated = { count: filtered.length };
+        } else if (args.aggregate === 'sum' && aggCol) {
+          const total = filtered.reduce((acc, v) => acc + (Number(v[aggCol.id]) || 0), 0);
+          aggregated = { sum: total, count: filtered.length };
+        } else if (args.aggregate === 'average' && aggCol) {
+          const sum = filtered.reduce((acc, v) => acc + (Number(v[aggCol.id]) || 0), 0);
+          aggregated = { average: filtered.length > 0 ? sum / filtered.length : 0, count: filtered.length };
+        } else if (args.aggregate === 'list') {
+          aggregated = { rows: filtered.map((v) => {
+            const named: Record<string, any> = {};
+            for (const p of db.properties) named[p.name] = v[p.id];
+            return named;
+          }) };
+        } else {
+          aggregated = { count: filtered.length, rows: filtered.slice(0, 50) };
+        }
+
+        return {
+          databaseId,
+          title: db.title,
+          filter: { categoryColumn: args.categoryColumn, categoryValue: args.categoryValue, dateColumn: args.dateColumn, dateFrom: args.dateFrom, dateTo: args.dateTo },
+          aggregate: args.aggregate,
+          result: aggregated,
+        };
       }
       case 'complete_task': {
         const task = await this.tasksService.toggle(userId, args.taskId);

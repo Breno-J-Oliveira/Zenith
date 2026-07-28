@@ -1,6 +1,84 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 
+/**
+ * Definição de um preset de database.
+ * Cada preset vem com propriedades e view padrão já configuradas,
+ * para que o usuário possa começar a usar em segundos.
+ */
+export interface PresetDefinition {
+  type: string;        // chave única (ex: 'finance', 'shopping')
+  title: string;       // nome exibido
+  icon: string;        // emoji
+  description: string; // descrição curta para o modal
+  properties: Array<{
+    name: string;
+    type: string;
+    options?: string;
+    order: number;
+  }>;
+}
+
+/**
+ * Catálogo de presets disponíveis.
+ * Adicionar novos aqui = automaticamente aparecem no modal do frontend
+ * e no `listPresets()` do backend.
+ */
+export const DATABASE_PRESETS: Record<string, PresetDefinition> = {
+  finance: {
+    type: 'finance',
+    title: 'Finanças',
+    icon: '💰',
+    description: 'Controle gastos e receitas com categorias',
+    properties: [
+      { name: 'Descrição', type: 'text', order: 0 },
+      { name: 'Valor', type: 'currency', options: JSON.stringify({ currency: 'BRL' }), order: 1 },
+      { name: 'Categoria', type: 'select', options: JSON.stringify({ options: ['Alimentação', 'Transporte', 'Lazer', 'Saúde', 'Educação', 'Moradia', 'Outros'] }), order: 2 },
+      { name: 'Data', type: 'date', order: 3 },
+      { name: 'Tipo', type: 'select', options: JSON.stringify({ options: ['Receita', 'Despesa'] }), order: 4 },
+    ],
+  },
+  shopping: {
+    type: 'shopping',
+    title: 'Lista de Compras',
+    icon: '🛒',
+    description: 'Itens de compra com preço e status',
+    properties: [
+      { name: 'Item', type: 'text', order: 0 },
+      { name: 'Quantidade', type: 'number', order: 1 },
+      { name: 'Preço', type: 'currency', options: JSON.stringify({ currency: 'BRL' }), order: 2 },
+      { name: 'Comprado', type: 'checkbox', order: 3 },
+      { name: 'Categoria', type: 'select', options: JSON.stringify({ options: ['Frutas', 'Verduras', 'Carnes', 'Laticínios', 'Padaria', 'Bebidas', 'Limpeza', 'Outros'] }), order: 4 },
+    ],
+  },
+  study: {
+    type: 'study',
+    title: 'Estudos',
+    icon: '📚',
+    description: 'Matérias, tópicos e progresso de aprendizado',
+    properties: [
+      { name: 'Matéria', type: 'text', order: 0 },
+      { name: 'Tópico', type: 'text', order: 1 },
+      { name: 'Status', type: 'select', options: JSON.stringify({ options: ['Não iniciado', 'Em andamento', 'Concluído'] }), order: 2 },
+      { name: 'Prioridade', type: 'select', options: JSON.stringify({ options: ['Alta', 'Média', 'Baixa'] }), order: 3 },
+      { name: 'Data da Prova', type: 'date', order: 4 },
+    ],
+  },
+  habits: {
+    type: 'habits',
+    title: 'Hábitos',
+    icon: '✅',
+    description: 'Acompanhe hábitos diários com streaks',
+    properties: [
+      { name: 'Hábito', type: 'text', order: 0 },
+      { name: 'Frequência', type: 'select', options: JSON.stringify({ options: ['Diário', 'Semanal', 'Mensal'] }), order: 1 },
+      { name: 'Streak', type: 'number', order: 2 },
+      { name: 'Última execução', type: 'date', order: 3 },
+      { name: 'Concluído', type: 'checkbox', order: 4 },
+    ],
+  },
+};
+
 @Injectable()
 export class DatabasesService {
   constructor(private prisma: PrismaService) {}
@@ -117,8 +195,37 @@ export class DatabasesService {
 
   // ─── ROW ────────────────────────────────────────────────────
 
-  async addRow(userId: string, databaseId: string, data: { values: string; coverImage?: string }) {
+  /**
+   * Adiciona linha a um database. Aceita os valores como objeto
+   * { propertyName: value } OU { propertyId: value } e converte
+   * internamente para o formato { propertyId: value } armazenado.
+   */
+  async addRow(userId: string, databaseId: string, data: { values: Record<string, any> | string; coverImage?: string }) {
     await this.findOne(userId, databaseId);
+
+    const database = await this.prisma.database.findUnique({
+      where: { id: databaseId },
+      include: { properties: true },
+    });
+    if (!database) throw new NotFoundException('Database não encontrado');
+
+    // Normaliza: aceita objeto { name: value } ou { id: value } ou string JSON
+    let valuesObj: Record<string, any>;
+    if (typeof data.values === 'string') {
+      valuesObj = JSON.parse(data.values);
+    } else {
+      valuesObj = data.values;
+    }
+
+    // Converte chaves de nome → id
+    const normalized: Record<string, any> = {};
+    for (const prop of database.properties) {
+      if (valuesObj[prop.id] !== undefined) {
+        normalized[prop.id] = valuesObj[prop.id];
+      } else if (valuesObj[prop.name] !== undefined) {
+        normalized[prop.id] = valuesObj[prop.name];
+      }
+    }
 
     const lastRow = await this.prisma.row.findFirst({
       where: { databaseId },
@@ -127,8 +234,9 @@ export class DatabasesService {
 
     return this.prisma.row.create({
       data: {
-        ...data,
         databaseId,
+        values: JSON.stringify(normalized),
+        coverImage: data.coverImage,
         order: (lastRow?.order ?? -1) + 1,
       },
     });
@@ -187,58 +295,29 @@ export class DatabasesService {
 
   // ─── PRESETS ────────────────────────────────────────────────
 
+  /**
+   * Lista os presets disponíveis (metadados, sem properties).
+   * Endpoint público (sem @CurrentUser) — não revela dados do user.
+   */
+  listPresets() {
+    return Object.values(DATABASE_PRESETS).map((p) => ({
+      type: p.type,
+      title: p.title,
+      icon: p.icon,
+      description: p.description,
+      propertiesCount: p.properties.length,
+    }));
+  }
+
+  /**
+   * Cria um database a partir de um preset.
+   * Cria o database + propriedades + view padrão "Tabela" atomicamente.
+   */
   async createFromPreset(userId: string, presetType: string) {
-    const presets: Record<string, any> = {
-      finance: {
-        title: 'Finanças',
-        icon: '💰',
-        properties: [
-          { name: 'Descrição', type: 'text', order: 0 },
-          { name: 'Valor', type: 'currency', options: JSON.stringify({ currency: 'BRL' }), order: 1 },
-          { name: 'Categoria', type: 'select', options: JSON.stringify({ options: ['Alimentação', 'Transporte', 'Lazer', 'Saúde', 'Educação', 'Outros'] }), order: 2 },
-          { name: 'Data', type: 'date', order: 3 },
-          { name: 'Tipo', type: 'select', options: JSON.stringify({ options: ['Receita', 'Despesa'] }), order: 4 },
-        ],
-      },
-      shopping: {
-        title: 'Lista de Compras',
-        icon: '🛒',
-        properties: [
-          { name: 'Item', type: 'text', order: 0 },
-          { name: 'Quantidade', type: 'number', order: 1 },
-          { name: 'Preço', type: 'currency', options: JSON.stringify({ currency: 'BRL' }), order: 2 },
-          { name: 'Comprado', type: 'checkbox', order: 3 },
-          { name: 'Categoria', type: 'select', options: JSON.stringify({ options: ['Frutas', 'Verduras', 'Carnes', 'Laticínios', 'Padaria', 'Bebidas', 'Limpeza', 'Outros'] }), order: 4 },
-        ],
-      },
-      study: {
-        title: 'Estudos',
-        icon: '📚',
-        properties: [
-          { name: 'Matéria', type: 'text', order: 0 },
-          { name: 'Tópico', type: 'text', order: 1 },
-          { name: 'Status', type: 'select', options: JSON.stringify({ options: ['Não iniciado', 'Em andamento', 'Concluído'] }), order: 2 },
-          { name: 'Prioridade', type: 'select', options: JSON.stringify({ options: ['Alta', 'Média', 'Baixa'] }), order: 3 },
-          { name: 'Data da Prova', type: 'date', order: 4 },
-        ],
-      },
-      habits: {
-        title: 'Hábitos',
-        icon: '✅',
-        properties: [
-          { name: 'Hábito', type: 'text', order: 0 },
-          { name: 'Frequência', type: 'select', options: JSON.stringify({ options: ['Diário', 'Semanal', 'Mensal'] }), order: 1 },
-          { name: 'Streak', type: 'number', order: 2 },
-          { name: 'Última execução', type: 'date', order: 3 },
-          { name: 'Concluído', type: 'checkbox', order: 4 },
-        ],
-      },
-    };
+    const preset = DATABASE_PRESETS[presetType];
+    if (!preset) throw new NotFoundException(`Preset '${presetType}' não encontrado`);
 
-    const preset = presets[presetType];
-    if (!preset) throw new NotFoundException('Preset não encontrado');
-
-    // Cria o database com propriedades
+    // Cria o database com view padrão
     const database = await this.prisma.database.create({
       data: {
         userId,
@@ -257,16 +336,36 @@ export class DatabasesService {
     });
 
     // Cria as propriedades
-    for (const prop of preset.properties) {
-      await this.prisma.property.create({
-        data: {
-          databaseId: database.id,
-          ...prop,
-        },
-      });
-    }
+    await this.prisma.property.createMany({
+      data: preset.properties.map((p) => ({
+        databaseId: database.id,
+        name: p.name,
+        type: p.type,
+        options: p.options,
+        order: p.order,
+      })),
+    });
 
     return this.findOne(userId, database.id);
+  }
+
+  /**
+   * Adiciona linha a um preset (usado pela IA quando o usuário diz
+   * "gastei 25 no pastel" — vai pro preset Finanças).
+   * Cria o preset automaticamente se ainda não existir.
+   */
+  async addRowToPreset(userId: string, presetType: string, values: Record<string, any>) {
+    // Encontra o database preset existente ou cria um novo
+    let database = await this.prisma.database.findFirst({
+      where: { userId, presetType, isPreset: true },
+    });
+    if (!database) {
+      const created = await this.createFromPreset(userId, presetType);
+      database = await this.prisma.database.findUnique({ where: { id: created.id } });
+    }
+    if (!database) throw new NotFoundException('Falha ao criar/encontrar database preset');
+
+    return this.addRow(userId, database.id, { values });
   }
 
   // ─── Helpers de ownership ──────────────────────────────────

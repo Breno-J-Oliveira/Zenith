@@ -23,6 +23,18 @@ export class DatabasesController {
     return this.databasesService.findAll(user.id, pageId);
   }
 
+  // ─── PRESETS (rotas estáticas — devem vir antes das rotas com :id) ──
+
+  @Get('presets')
+  listPresets() {
+    return this.databasesService.listPresets();
+  }
+
+  @Post('create-from-preset/:presetType')
+  createFromPreset(@CurrentUser() user: ZenithUser, @Param('presetType') presetType: string) {
+    return this.databasesService.createFromPreset(user.id, presetType);
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: ZenithUser, @Param('id') id: string) {
     return this.databasesService.findOne(user.id, id);
@@ -128,10 +140,4 @@ export class DatabasesController {
     return this.databasesService.removeView(user.id, viewId);
   }
 
-  // ─── PRESETS (rota deve vir antes de :id para evitar conflito) ──
-
-  @Post('create-from-preset/:presetType')
-  createFromPreset(@CurrentUser() user: ZenithUser, @Param('presetType') presetType: string) {
-    return this.databasesService.createFromPreset(user.id, presetType);
-  }
 }
