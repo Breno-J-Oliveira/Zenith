@@ -88,7 +88,7 @@ export function GoalCard({
   const progress = calcProgress(goal);
 
   return (
-    <div className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-lg overflow-hidden">
+    <div className="card card-interactive overflow-hidden animate-fade-in">
       {/* Goal header */}
       <div
         className="p-5 cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors"
@@ -98,7 +98,7 @@ export function GoalCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <span
-                className="inline-block w-2 h-2 rounded-full shrink-0"
+                className="inline-block w-2 h-2 rounded-full shrink-0 animate-pulse-glow"
                 style={{ background: priorityColors[goal.priority] || 'var(--color-text-dim)' }}
               />
               <h3 className="font-orbitron text-lg font-bold truncate">{goal.title}</h3>
@@ -106,10 +106,14 @@ export function GoalCard({
             {goal.description && <p className="text-sm text-dim truncate">{goal.description}</p>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="font-mono text-xs px-2 py-1 rounded border border-[var(--color-surface-2)] text-dim">
+            <span className="badge badge-primary">
               {categoryLabels[goal.category] || goal.category}
             </span>
-            <span className="font-mono text-xs px-2 py-1 rounded border border-[var(--color-surface-2)] text-dim">
+            <span className={`badge ${
+              goal.status === 'ACTIVE' ? 'badge-primary' :
+              goal.status === 'COMPLETED' ? 'badge-success' :
+              goal.status === 'CANCELLED' ? 'badge-danger' : 'badge-warning'
+            }`}>
               {statusLabels[goal.status] || goal.status}
             </span>
           </div>
@@ -117,10 +121,10 @@ export function GoalCard({
 
         <ProgressBar progress={progress} />
 
-        <div className="flex items-center gap-4 mt-3 text-xs text-dim font-mono">
-          <span>{goal.milestones.length} marcos</span>
-          <span>{goal.tasks.length} tarefas</span>
-          {goal.deadline && <span>Deadline: {new Date(goal.deadline).toLocaleDateString('pt-BR')}</span>}
+        <div className="flex items-center gap-4 mt-3 text-xs text-muted font-mono">
+          <span>🎯 {goal.milestones.length} marcos</span>
+          <span>📋 {goal.tasks.length} tarefas</span>
+          {goal.deadline && <span>📅 {new Date(goal.deadline).toLocaleDateString('pt-BR')}</span>}
         </div>
       </div>
 
@@ -134,10 +138,10 @@ export function GoalCard({
               <button
                 key={s}
                 onClick={() => onStatusChange(s)}
-                className={`font-mono text-xs px-2 py-1 rounded border transition-colors ${
+                className={`btn btn-ghost font-mono text-xs ${
                   goal.status === s
-                    ? 'border-[var(--color-primary)] text-primary'
-                    : 'border-[var(--color-surface-2)] text-dim hover:text-white'
+                    ? 'text-primary border border-[var(--color-primary)]'
+                    : ''
                 }`}
               >
                 {statusLabels[s]}
@@ -145,9 +149,9 @@ export function GoalCard({
             ))}
             <button
               onClick={onDelete}
-              className="ml-auto font-mono text-xs px-2 py-1 rounded border border-[var(--color-surface-2)] text-dim hover:text-red-400 hover:border-red-400 transition-colors"
+              className="ml-auto btn btn-ghost font-mono text-xs text-danger hover:border-[var(--color-danger)]"
             >
-              Excluir
+              🗑️ Excluir
             </button>
           </div>
 

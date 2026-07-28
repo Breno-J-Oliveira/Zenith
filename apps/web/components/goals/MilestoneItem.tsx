@@ -8,13 +8,13 @@ interface MilestoneItemProps {
 
 export function MilestoneItem({ title, deadline, completed, onToggle, onDelete }: MilestoneItemProps) {
   return (
-    <div className="flex items-center gap-2 group">
+    <div className="flex items-center gap-2 group py-1 px-2 rounded-md hover:bg-[var(--color-surface-2)]/30 transition-colors">
       <button
         onClick={onToggle}
-        className={`w-4 h-4 rounded border shrink-0 transition-colors ${
+        className={`w-4 h-4 rounded border shrink-0 transition-all duration-200 flex items-center justify-center ${
           completed
-            ? 'bg-primary border-primary'
-            : 'border-[var(--color-surface-2)] hover:border-[var(--color-primary)]'
+            ? 'bg-[var(--color-success)] border-[var(--color-success)] glow-subtle'
+            : 'border-[var(--border-default)] hover:border-[var(--color-primary)]'
         }`}
       >
         {completed && (
@@ -23,13 +23,17 @@ export function MilestoneItem({ title, deadline, completed, onToggle, onDelete }
           </svg>
         )}
       </button>
-      <span className={`text-sm flex-1 ${completed ? 'line-through text-dim' : 'text-white'}`}>
+      <span className={`text-sm flex-1 transition-all duration-200 ${completed ? 'line-through text-muted' : 'text-[var(--color-text)]'}`}>
         {title}
       </span>
-      {deadline && <span className="font-mono text-xs text-dim">{new Date(deadline).toLocaleDateString('pt-BR')}</span>}
+      {deadline && (
+        <span className="font-mono text-xs text-muted px-2 py-0.5 rounded bg-[var(--color-surface-2)]">
+          📅 {new Date(deadline).toLocaleDateString('pt-BR')}
+        </span>
+      )}
       <button
         onClick={onDelete}
-        className="text-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
+        className="text-muted hover:text-[var(--color-danger)] opacity-0 group-hover:opacity-100 transition-all duration-200 text-xs"
       >
         ✕
       </button>

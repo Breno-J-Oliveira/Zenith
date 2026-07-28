@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
 const menuItems = [
   {
@@ -97,10 +98,11 @@ const menuItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
   return (
     <aside className="fixed left-0 top-16 bottom-0 w-[72px] bg-[var(--color-surface-1)] border-r border-[var(--color-surface-2)] flex flex-col items-center py-4 z-40 sidebar-hud">
-      {/* Indicador de posição */}
+      {/* Indicador de posição superior */}
       <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-[var(--color-primary)] to-transparent opacity-30" />
 
       <nav className="flex flex-col items-center gap-1 w-full px-2 flex-1">
@@ -119,6 +121,8 @@ export function Sidebar() {
                 }
               `}
               title={item.label}
+              onMouseEnter={() => setHoveredItem(item.label)}
+              onMouseLeave={() => setHoveredItem(null)}
             >
               {/* Glow effect quando ativo */}
               {isActive && (
