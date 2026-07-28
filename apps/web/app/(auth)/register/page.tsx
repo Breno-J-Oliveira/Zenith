@@ -23,14 +23,19 @@ export default function RegisterPage() {
     }
   }, [loading, isAuthenticated, router]);
 
-  // Validações em tempo real
+  // Validações em tempo real (espelha password.schema.ts do NexusAuth)
+  const COMMON_PASSWORDS = ['password','123456','12345678','qwerty','abc123','senha','senha123','admin','letmein','welcome','monkey','master','dragon','login','princess','football','shadow','sunshine','trustno1','batman','access','hello','charlie','donald','michael','qwerty123','1q2w3e4r','password1','password123'];
   const checks = {
-    length: password.length >= 8,
+    length: password.length >= 8 && password.length <= 128,
     upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
     number: /[0-9]/.test(password),
-    special: /[^A-Za-z0-9]/.test(password),
+    special: /[^a-zA-Z0-9]/.test(password),
+    noCommon: !COMMON_PASSWORDS.includes(password.toLowerCase()),
+    noSequential: !/(.)\1{3,}/.test(password),
+    noKeyboard: !/qwerty|asdf|zxcv|1234|abcd/i.test(password),
   };
-  const allValid = checks.length && checks.upper && checks.number && checks.special;
+  const allValid = Object.values(checks).every(Boolean);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -162,16 +167,22 @@ export default function RegisterPage() {
               {/* Requisitos de senha em tempo real */}
               <div className="mt-2 space-y-1">
                 <p className={`text-[10px] font-mono ${checks.length ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
-                  {checks.length ? '✓' : '○'} Mínimo 8 caracteres
+                  {checks.length ? '✓' : '○'} 8-128 caracteres
                 </p>
-                <p className={`text-[10px] font-mono ${checks.upper ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
-                  {checks.upper ? '✓' : '○'} Uma letra maiúscula (A-Z)
+                <p className={`text-[10px] font-mono ${checks.upper && checks.lower ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
+                  {checks.upper && checks.lower ? '✓' : '○'} Maiúsculas e minúsculas (Aa)
                 </p>
                 <p className={`text-[10px] font-mono ${checks.number ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
                   {checks.number ? '✓' : '○'} Um número (0-9)
                 </p>
                 <p className={`text-[10px] font-mono ${checks.special ? 'text-[var(--color-success)]' : 'text-[var(--color-text-muted)]'}`}>
-                  {checks.special ? '✓' : '○'} Um caractere especial (!@#$%...)
+                  {checks.special ? '✓' : '○'} Um símbolo (!@#$%...)
+                </p>
+                <p className={`text-[10px] font-mono ${checks.noKeyboard ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
+                  {checks.noKeyboard ? '✓' : '✕'} Sem padrões de teclado (1234, qwerty, abcd)
+                </p>
+                <p className={`text-[10px] font-mono ${checks.noCommon ? 'text-[var(--color-success)]' : 'text-[var(--color-danger)]'}`}>
+                  {checks.noCommon ? '✓' : '✕'} Não ser senha comum
                 </p>
               </div>
             </div>
