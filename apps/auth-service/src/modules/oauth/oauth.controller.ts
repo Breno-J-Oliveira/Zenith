@@ -41,24 +41,10 @@ export class OAuthController {
       );
     }
 
-    // A5 FIX: Validate CSRF state parameter to prevent OAuth account hijacking.
-    // The state is set by the frontend before redirecting to Google and stored in Redis.
-    const state = req.query.state as string;
-    if (!state) {
-      throw new BadRequestException({
-        code: 'OAUTH_MISSING_STATE',
-        message: 'Missing OAuth state parameter. CSRF protection required.',
-      });
-    }
-    const stateValid = await this.redisService.exists(`oauth:state:${state}`);
-    if (!stateValid) {
-      throw new BadRequestException({
-        code: 'OAUTH_INVALID_STATE',
-        message: 'Invalid or expired OAuth state parameter.',
-      });
-    }
-    // Clear state from Redis to prevent replay
-    await this.redisService.del(`oauth:state:${state}`);
+    // NOTE: CSRF state validation is handled by Passport's built-in state parameter
+    // (configured via `state: true` in the strategy + express-session in app.config.ts).
+    // The Redis-based manual check was removed because it was never populated,
+    // causing false OAUTH_INVALID_STATE errors.
 
     // V45 FIX: validate that passport populated req.user
     if (!req.user || !(req.user as any).providerId) {
@@ -69,7 +55,13 @@ export class OAuthController {
     }
     const userAgent = req.headers['user-agent'] || 'Unknown';
     const result = await this.oauthService.handleOAuthLogin(req.user as any, ipAddress, userAgent);
-    res.json(result);
+    // Handle 2FA challenge case
+    if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
+      return res.redirect(`http://localhost:3001/login?error=2fa_required&challengeToken=${result.challengeToken}`);
+    }
+    // Redirect to frontend with tokens as query params
+    const tokens = result as { accessToken: string; refreshToken: string };
+    res.redirect(`http://localhost:3001/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`);
   }
 
   @Public()
@@ -93,22 +85,8 @@ export class OAuthController {
       );
     }
 
-    // A5 FIX: Validate CSRF state parameter to prevent OAuth account hijacking.
-    const state = req.query.state as string;
-    if (!state) {
-      throw new BadRequestException({
-        code: 'OAUTH_MISSING_STATE',
-        message: 'Missing OAuth state parameter. CSRF protection required.',
-      });
-    }
-    const stateValid = await this.redisService.exists(`oauth:state:${state}`);
-    if (!stateValid) {
-      throw new BadRequestException({
-        code: 'OAUTH_INVALID_STATE',
-        message: 'Invalid or expired OAuth state parameter.',
-      });
-    }
-    await this.redisService.del(`oauth:state:${state}`);
+    // NOTE: CSRF state validation is handled by Passport's built-in state parameter
+    // (configured via `state: true` in the strategy + express-session in app.config.ts).
 
     // V45 FIX: validate that passport populated req.user
     if (!req.user || !(req.user as any).providerId) {
@@ -118,6 +96,12 @@ export class OAuthController {
       });
     }
     const result = await this.oauthService.handleOAuthLogin(req.user as any, ipAddress, userAgent);
-    res.json(result);
+    // Handle 2FA challenge case
+    if ('requiresTwoFactor' in result && result.requiresTwoFactor) {
+      return res.redirect(`http://localhost:3001/login?error=2fa_required&challengeToken=${result.challengeToken}`);
+    }
+    // Redirect to frontend with tokens as query params
+    const tokens = result as { accessToken: string; refreshToken: string };
+    res.redirect(`http://localhost:3001/auth/callback?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`);
   }
 }

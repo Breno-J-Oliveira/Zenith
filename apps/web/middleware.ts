@@ -31,6 +31,7 @@ const PUBLIC_ROUTES = [
 const PUBLIC_PREFIXES = [
   '/verify-email/',
   '/reset-password/',
+  '/auth/callback',
   '/_next',
   '/api',
   '/favicon',

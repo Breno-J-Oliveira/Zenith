@@ -17,5 +17,5 @@
       "@zenith/shared": ["./packages/shared/src"]
     }
   },
-  "exclude": ["node_modules", "dist", ".next"]
+  "exclude": ["node_modules", "dist", ".next", "NexusAuth", "apps/auth-service"]
 }

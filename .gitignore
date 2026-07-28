@@ -57,8 +57,18 @@ Thumbs.db
 
 # ─── Notas privadas ────────────────────────────────────────
 ANOTAÇÕES.md
+"anotações de ia.md"
 docs/estilo-visual.md
+
+# ─── Regras de IA e comunicação (NUNCA commitar!) ─────────
+.clinerules
+comunictionIA.md
+configuracao.md
+IA OPERATION/
 
 # ─── Docker volumes ────────────────────────────────────────
 postgres_data/
 redis_data/
+
+# ─── NexusAuth repo separado (não commitar no Zenith) ─────
+NexusAuth/

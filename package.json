@@ -19,6 +19,7 @@
   },
   "packageManager": "npm@10.0.0",
   "dependencies": {
-    "@next/swc-win32-x64-msvc": "^16.2.12"
+    "@next/swc-win32-x64-msvc": "^16.2.12",
+    "@reduxjs/toolkit": "^2.12.0"
   }
 }

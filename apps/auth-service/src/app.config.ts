@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import session from 'express-session';
 import * as express from 'express';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
@@ -124,6 +125,21 @@ export function configureApp(app: INestApplication): void {
     logger.error('Generate: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"');
   }
   app.use(cookieParser(cookieSecret || undefined));
+
+  // 4b. Express session — required for OAuth2 state parameter (passport-oauth2)
+  app.use(
+    session({
+      secret: cookieSecret || 'nexusauth-session-dev-secret',
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: isProd,
+        httpOnly: true,
+        maxAge: 15 * 60 * 1000, // 15 minutes (just for OAuth flow)
+        sameSite: isProd ? 'strict' : 'lax',
+      },
+    }),
+  );
 
   // 5. Security headers middleware (Permissions-Policy, Clear-Site-Data)
   const securityHeaders = app.get(SecurityHeadersMiddleware);

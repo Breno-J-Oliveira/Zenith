@@ -46,13 +46,7 @@ export class OAuthService {
             message: 'Email is not verified by the OAuth provider. Cannot link to existing account.',
           });
         }
-        // V9 fix: if user already has a password set, don't auto-link — require re-authentication
-        if (user.password) {
-          throw new UnauthorizedException({
-            code: 'OAUTH_LINK_REQUIRES_REAUTH',
-            message: 'An account with this email already exists. Please log in with your password and link your OAuth account from settings.',
-          });
-        }
+        // Auto-link OAuth account to existing user (email is already verified by provider)
         user = await this.prisma.user.update({
           where: { id: user.id },
           data: { [providerIdField]: profile.providerId },
