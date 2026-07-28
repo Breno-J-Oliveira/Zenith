@@ -3,6 +3,7 @@ import { GoalsService } from '../goals/goals.service';
 import { RoutinesService } from '../routines/routines.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
 import { ConflictResolver } from '../shared/conflict-resolver.service';
+import { MOCK_USER_ID } from '../prisma.service';
 
 export interface CalendarEvent {
   id: string;
@@ -40,7 +41,7 @@ export class CalendarService {
     const events: CalendarEvent[] = [];
 
     // Tasks from goals (with date)
-    const goalsTasks = await this.goalsService.getTasks();
+    const goalsTasks = await this.goalsService.getTasks(MOCK_USER_ID);
     for (const task of goalsTasks) {
       if (!task.date) continue;
       if (task.date >= from && task.date <= to) {
@@ -57,7 +58,7 @@ export class CalendarService {
     }
 
     // Tasks from routines (generated)
-    const routineTasks = await this.routinesService.getGeneratedTasks();
+    const routineTasks = await this.routinesService.getGeneratedTasks(MOCK_USER_ID);
     for (const task of routineTasks) {
       if (!task.date) continue;
       if (task.date >= from && task.date <= to) {
@@ -77,7 +78,7 @@ export class CalendarService {
     }
 
     // Appointments
-    const appointments = await this.schedulerService.findAll();
+    const appointments = await this.schedulerService.findAll(MOCK_USER_ID);
     for (const appt of appointments) {
       if (appt.date >= from && appt.date <= to) {
         events.push({
@@ -102,13 +103,13 @@ export class CalendarService {
     const sourceId = dto.eventId.replace(/^cal-(task|rtask|appt)-/, '');
 
     if (dto.type === 'task') {
-      const task = await this.routinesService.updateGeneratedTask(sourceId, {
+      const task = await this.routinesService.updateGeneratedTask(MOCK_USER_ID, sourceId, {
         date: newDate,
         time: newTime,
       } as any);
 
       // Check for conflicts with other events on the new date
-      const dayTasks = await this.routinesService.getTasksForDate(newDate);
+      const dayTasks = await this.routinesService.getTasksForDate(MOCK_USER_ID, newDate);
       const moved: RescheduleResult['moved'] = [];
 
       const taskDuration = (task as any)?.duration || 60;
@@ -131,7 +132,7 @@ export class CalendarService {
             busy,
           });
           if (newSlot) {
-            await this.routinesService.updateGeneratedTask(other.id, { time: newSlot.time } as any);
+            await this.routinesService.updateGeneratedTask(MOCK_USER_ID, other.id, { time: newSlot.time } as any);
             moved.push({
               taskId: other.id,
               taskTitle: other.title,
@@ -175,7 +176,7 @@ export class CalendarService {
   }
 
   private async buildBusyListForDate(date: string, excludeTaskId: string, alsoExcludeTaskId: string) {
-    const dayTasks = await this.routinesService.getTasksForDate(date);
+    const dayTasks = await this.routinesService.getTasksForDate(MOCK_USER_ID, date);
     const busy = dayTasks
       .filter(t => t.id !== excludeTaskId && t.id !== alsoExcludeTaskId)
       .map(t => {
@@ -183,7 +184,7 @@ export class CalendarService {
         return { start: s, end: s + ((t as any).duration || 60) };
       });
 
-    const appointments = await this.schedulerService.findAll();
+    const appointments = await this.schedulerService.findAll(MOCK_USER_ID);
     for (const appt of appointments.filter(a => a.date === date)) {
       busy.push({
         start: this.conflictResolver.toMinutes(appt.startTime),

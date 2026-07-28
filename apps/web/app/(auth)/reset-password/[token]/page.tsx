@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
-import { Logo } from '@zenith/shared';
 import { useAuth } from '../../../../components/auth/AuthProvider';
 
 export default function ResetPasswordPage() {
@@ -110,7 +109,7 @@ export default function ResetPasswordPage() {
 
       <div className="relative w-full max-w-md">
         <div className="flex flex-col items-center mb-8">
-          <Logo size={64} className="text-primary mb-4" />
+          <div className="text-6xl mb-4">✦</div>
           <h1 className="font-orbitron text-3xl font-bold tracking-wide">
             <span className="text-primary">Z</span>
             <span className="text-[var(--color-text)]">ENITH</span>

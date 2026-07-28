@@ -48,7 +48,7 @@ export class AIService {
 
     if (result.intent === 'CREATE_ROUTINE' && result.payload) {
       const payload = result.payload as RoutinePayload;
-      const routine = await this.routinesService.create({
+      const routine = await this.routinesService.create(MOCK_USER_ID, {
         title: payload.title,
         frequency: payload.frequency,
         time: payload.time,
@@ -59,7 +59,7 @@ export class AIService {
 
     if (result.intent === 'CREATE_APPOINTMENT' && result.payload) {
       const payload = result.payload as AppointmentPayload;
-      const reorgResult = await this.schedulerService.createAppointment({
+      const reorgResult = await this.schedulerService.createAppointment(MOCK_USER_ID, {
         title: payload.title,
         date: payload.date,
         startTime: payload.startTime,
@@ -96,11 +96,11 @@ export class AIService {
   async getBriefing(): Promise<{ text: string; source: 'gemini' | 'template' }> {
     const today = new Date().toISOString().split('T')[0];
 
-    const goals = await this.goalsService.findAll({ status: 'ACTIVE' as any });
-    const routineTasks = await this.routinesService.getTasksForDate(today);
-    const goalTasks = await this.goalsService.getTasks();
+    const goals = await this.goalsService.findAll(MOCK_USER_ID);
+    const routineTasks = await this.routinesService.getTasksForDate(MOCK_USER_ID, today);
+    const goalTasks = await this.goalsService.getTasks(MOCK_USER_ID);
     const todayGoalTasks = goalTasks.filter(t => t.date === today);
-    const appointments = await this.schedulerService.findAll();
+    const appointments = await this.schedulerService.findAll(MOCK_USER_ID);
     const todayAppointments = appointments.filter(a => a.date === today);
 
     const allTodayItems = [
@@ -109,12 +109,12 @@ export class AIService {
       ...todayAppointments.map(a => ({ title: a.title, time: `${a.startTime}-${a.endTime}`, type: 'compromisso' })),
     ].sort((a, b) => a.time.localeCompare(b.time));
 
-    const activeRoutines = await this.routinesService.findAll({ active: true });
+    const activeRoutines = await this.routinesService.findAll(MOCK_USER_ID);
 
     const goalProgress = await Promise.all(
       goals.map(async g => ({
         title: g.title,
-        progress: await this.goalsService.getProgress(g.id),
+        progress: await this.goalsService.getProgress(MOCK_USER_ID, g.id),
       }))
     );
 

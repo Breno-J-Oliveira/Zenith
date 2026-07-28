@@ -194,22 +194,22 @@ export class ChatService {
     try {
       switch (tool.name) {
         case 'list_goals': {
-          const goals = await this.goalsService.findAll({});
+          const goals = await this.goalsService.findAll(MOCK_USER_ID);
           return { success: true, data: goals };
         }
 
         case 'list_tasks': {
-          const tasks = await this.tasksService.findAll();
+          const tasks = await this.tasksService.findAll(MOCK_USER_ID);
           return { success: true, data: tasks };
         }
 
         case 'list_routines': {
-          const routines = await this.routinesService.findAll();
+          const routines = await this.routinesService.findAll(MOCK_USER_ID);
           return { success: true, data: routines };
         }
 
         case 'create_goal': {
-          const goal = await this.goalsService.create({
+          const goal = await this.goalsService.create(MOCK_USER_ID, {
             title: tool.arguments.title,
             category: tool.arguments.category || 'pessoal',
             priority: tool.arguments.priority || 'media',
@@ -218,7 +218,7 @@ export class ChatService {
         }
 
         case 'create_task': {
-          const task = await this.tasksService.create({
+          const task = await this.tasksService.create(MOCK_USER_ID, {
             title: tool.arguments.title,
             goalId: tool.arguments.goalId,
           });
@@ -226,7 +226,7 @@ export class ChatService {
         }
 
         case 'create_routine': {
-          const routine = await this.routinesService.create({
+          const routine = await this.routinesService.create(MOCK_USER_ID, {
             title: tool.arguments.title,
             time: tool.arguments.time || '08:00',
             duration: tool.arguments.duration || 60,
@@ -236,8 +236,8 @@ export class ChatService {
         }
 
         case 'get_today_summary': {
-          const tasks = await this.tasksService.findAll();
-          const routines = await this.routinesService.findAll();
+          const tasks = await this.tasksService.findAll(MOCK_USER_ID);
+          const routines = await this.routinesService.findAll(MOCK_USER_ID);
           const today = new Date().toISOString().split('T')[0];
           const todayTasks = tasks.filter((t: any) => t.date === today);
           return {
@@ -253,8 +253,8 @@ export class ChatService {
 
         case 'search': {
           const query = tool.arguments.query.toLowerCase();
-          const goals = await this.goalsService.findAll({});
-          const tasks = await this.tasksService.findAll();
+          const goals = await this.goalsService.findAll(MOCK_USER_ID);
+          const tasks = await this.tasksService.findAll(MOCK_USER_ID);
           
           const matchedGoals = goals.filter((g: any) => 
             g.title.toLowerCase().includes(query)

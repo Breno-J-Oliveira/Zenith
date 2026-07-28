@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:auth": "npm run start:dev --workspace=apps/auth-service",
-    "dev:backend": "npm run start:dev --workspace=apps/backend",
+    "dev:backend": "npm run dev --workspace=apps/backend",
     "dev:web": "npm run dev --workspace=apps/web",
     "build": "turbo run build",
     "lint": "turbo run lint",
@@ -17,5 +17,8 @@
   "devDependencies": {
     "turbo": "^1.11.0"
   },
-  "packageManager": "npm@10.0.0"
+  "packageManager": "npm@10.0.0",
+  "dependencies": {
+    "@next/swc-win32-x64-msvc": "^16.2.12"
+  }
 }

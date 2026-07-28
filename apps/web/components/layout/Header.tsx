@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Logo } from '@zenith/shared';
 import { useAuth } from '../auth/AuthProvider';
 import { GlobalSearch } from '../search/GlobalSearch';
 import { CommandPalette } from '../command/CommandPalette';
@@ -51,7 +50,7 @@ export function Header() {
       <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--color-surface-1)]/95 backdrop-blur-md border-b border-[var(--color-surface-2)] flex items-center justify-between px-6 z-50 header-hud">
         <Link href={isAuthenticated ? '/dashboard' : '/'} className="flex items-center gap-3 group">
           <div className="relative">
-            <Logo size={32} className="text-[var(--color-primary)] transition-all duration-300 group-hover:drop-shadow-[0_0_8px_var(--color-primary)]" />
+            <span className="text-3xl text-[var(--color-primary)] transition-all duration-300 group-hover:drop-shadow-[0_0_8px_var(--color-primary)]">✦</span>
           </div>
           <span className="font-orbitron text-xl font-bold tracking-wider">
             <span className="text-[var(--color-primary)]">Z</span>

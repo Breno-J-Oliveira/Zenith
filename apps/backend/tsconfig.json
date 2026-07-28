@@ -21,6 +21,6 @@
     "esModuleInterop": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "../../packages/shared/src/types/**/*", "../../packages/shared/src/ai/**/*"],
+  "include": ["src/**/*", "../../packages/shared/src/types/**/*", "../../packages/shared/src/ai/**/*", "../../packages/shared/src/auth/**/*"],
   "exclude": ["node_modules", "dist"]
 }

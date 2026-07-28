@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
 export interface JwkKey {
+  [key: string]: string;
   kty: string;
   kid: string;
   use: string;

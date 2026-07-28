@@ -17,10 +17,11 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { NexusAuthClient } from '@zenith/shared';
+import { NexusAuthClient } from '../../../../packages/shared/src/auth';
 import { ConfigService } from '@nestjs/config';
 import { NexusAuthGuard, Public } from './auth.guard';
-import { CurrentUser, ZenithUser, NexusJwtPayload } from './current-user.decorator';
+import { CurrentUser, ZenithUser } from './current-user.decorator';
+import { NexusJwtPayload } from './jwks.service';
 
 @Injectable()
 export class ZenithAuthClient {
