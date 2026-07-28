@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService, MOCK_USER_ID } from '../prisma.service';
 import { AgentService } from './agent.service';
 
@@ -98,8 +98,18 @@ export class ChatService {
     //    Com fallback gracioso se o provedor estiver sobrecarregado.
     let result;
     try {
-      result = await this.agentService.process(content, history);
+      // Validação: rejeita mensagens vazias ou excessivamente longas
+      const trimmed = content?.trim() ?? '';
+      if (!trimmed) {
+        throw new BadRequestException('Mensagem vazia');
+      }
+      if (trimmed.length > 4000) {
+        throw new BadRequestException('Mensagem muito longa (máx 4000 caracteres)');
+      }
+      result = await this.agentService.process(trimmed, history);
     } catch (err: any) {
+      // Se for BadRequest, propaga para o controller retornar 400
+      if (err?.status === 400) throw err;
       this.logger.error(`Agent falhou: ${err.message}`);
       result = {
         text: '⚠️ A IA está temporariamente sobrecarregada (erro do provedor). Tente novamente em alguns segundos.',

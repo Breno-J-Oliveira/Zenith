@@ -8,6 +8,19 @@ import { SchedulerService } from '../scheduler/scheduler.service';
 import { DatabasesService } from '../databases/databases.service';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
+
+/**
+ * Normaliza uma string removendo acentos e colocando em minúsculas.
+ * Usado para comparar títulos de databases independente de
+ * "Finanças" vs "Financas" vs "finanças" — todas devem casar.
+ */
+function normalize(s: string): string {
+  return s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
 const MAX_TOOL_TURNS = 6; // limite para evitar loops infinitos
 
 const SYSTEM_INSTRUCTION = `Você é o assistente inteligente do Zenith, uma aplicação de organização pessoal.
@@ -252,6 +265,27 @@ export class AgentService {
                 date: { type: 'string', description: 'Data do gasto (YYYY-MM-DD), opcional — default hoje' },
               },
               required: ['description', 'amount'],
+            },
+          },
+          {
+            name: 'list_databases',
+            description: 'Lista todos os databases do usuário (exceto os que não são presets). Útil para descobrir quais databases existem antes de consultar.',
+            parameters: {
+              type: 'object',
+              properties: {
+                onlyPresets: { type: 'boolean', description: 'Se true, retorna apenas os databases que vieram de presets' },
+              },
+            },
+          },
+          {
+            name: 'get_database_schema',
+            description: 'Retorna o schema (nome, tipo, opções) das colunas de um database específico. Use ANTES de query_database para entender quais colunas e valores são válidos.',
+            parameters: {
+              type: 'object',
+              properties: {
+                databaseTitle: { type: 'string' },
+                databaseId: { type: 'string' },
+              },
             },
           },
           {
@@ -582,11 +616,12 @@ export class AgentService {
         return { id: db.id, title: db.title, icon: db.icon, propertiesCount: db.properties.length, status: 'created' };
       }
       case 'add_to_database': {
-        // Resolve database (por ID ou título)
+        // Resolve database (por ID ou título — normalizado para ignorar acentos/maiúsculas)
         let databaseId = args.databaseId;
         if (!databaseId && args.databaseTitle) {
           const db = await this.databasesService.findAll(userId);
-          const found = db.find((d) => d.title.toLowerCase() === args.databaseTitle.toLowerCase());
+          const target = normalize(args.databaseTitle);
+          const found = db.find((d) => normalize(d.title) === target);
           if (!found) {
             return { error: `Database com título "${args.databaseTitle}" não encontrado. Crie-o primeiro.` };
           }
@@ -609,11 +644,57 @@ export class AgentService {
         const row = await this.databasesService.addRowToPreset(userId, 'finance', values);
         return { id: row.id, ...values, status: 'expense_logged' };
       }
+      case 'list_databases': {
+        const all = await this.databasesService.findAll(userId);
+        const filtered = args.onlyPresets ? all.filter((d) => d.isPreset) : all;
+        return {
+          count: filtered.length,
+          databases: filtered.map((d) => ({
+            id: d.id,
+            title: d.title,
+            icon: d.icon,
+            isPreset: d.isPreset,
+            presetType: d.presetType,
+            propertiesCount: d.properties?.length || 0,
+            rowsCount: (d as any)._count?.rows || 0,
+          })),
+        };
+      }
+      case 'get_database_schema': {
+        let databaseId = args.databaseId;
+        if (!databaseId && args.databaseTitle) {
+          const db = await this.databasesService.findAll(userId);
+          const target = normalize(args.databaseTitle);
+          const found = db.find((d) => normalize(d.title) === target);
+          if (!found) return { error: `Database "${args.databaseTitle}" não encontrado.` };
+          databaseId = found.id;
+        }
+        if (!databaseId) return { error: 'Forneça databaseId ou databaseTitle.' };
+        const db = await this.databasesService.findOne(userId, databaseId);
+        return {
+          databaseId: db.id,
+          title: db.title,
+          icon: db.icon,
+          isPreset: db.isPreset,
+          properties: db.properties.map((p: any) => {
+            let opts: any = null;
+            try { opts = p.options ? JSON.parse(p.options) : null; } catch {}
+            return {
+              id: p.id,
+              name: p.name,
+              type: p.type,
+              options: opts,
+              order: p.order,
+            };
+          }),
+        };
+      }
       case 'get_database_rows': {
         let databaseId = args.databaseId;
         if (!databaseId && args.databaseTitle) {
           const db = await this.databasesService.findAll(userId);
-          const found = db.find((d) => d.title.toLowerCase() === args.databaseTitle.toLowerCase());
+          const target = normalize(args.databaseTitle);
+          const found = db.find((d) => normalize(d.title) === target);
           if (!found) return { error: `Database "${args.databaseTitle}" não encontrado.` };
           databaseId = found.id;
         }
@@ -644,7 +725,8 @@ export class AgentService {
         let databaseId = args.databaseId;
         if (!databaseId && args.databaseTitle) {
           const db = await this.databasesService.findAll(userId);
-          const found = db.find((d) => d.title.toLowerCase() === args.databaseTitle.toLowerCase());
+          const target = normalize(args.databaseTitle);
+          const found = db.find((d) => normalize(d.title) === target);
           if (!found) return { error: `Database "${args.databaseTitle}" não encontrado.` };
           databaseId = found.id;
         }
