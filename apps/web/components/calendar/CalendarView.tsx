@@ -87,27 +87,29 @@ export function CalendarView({ onReorgMessage }: CalendarViewProps) {
   }));
 
   return (
-    <div className="bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-lg p-4">
+    <div className="card p-4">
       <style>{`
         .fc { color: var(--color-text); }
         .fc .fc-toolbar-title { font-family: var(--font-orbitron); font-size: 1.1rem; }
         .fc .fc-button {
           background: var(--color-surface-2);
-          border: 1px solid var(--color-surface-2);
+          border: 1px solid var(--border-default);
           color: var(--color-text-dim);
           font-family: var(--font-mono);
           font-size: 0.75rem;
+          transition: all var(--transition-fast);
         }
-        .fc .fc-button:hover { color: var(--color-primary); border-color: var(--color-primary); }
-        .fc .fc-button-active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .fc .fc-button:hover { color: var(--color-primary); border-color: var(--color-primary); box-shadow: var(--glow-subtle); }
+        .fc .fc-button-active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; box-shadow: var(--glow-sm); }
         .fc .fc-col-header-cell-cushion { color: var(--color-text-dim); font-family: var(--font-mono); font-size: 0.7rem; }
         .fc .fc-daygrid-day-number, .fc .fc-timegrid-slot-label-cushion { color: var(--color-text); font-family: var(--font-mono); font-size: 0.8rem; }
         .fc .fc-day-today { background: var(--color-surface-2) !important; }
-        .fc .fc-event { cursor: pointer; border-radius: 4px; padding: 1px 4px; font-size: 0.75rem; }
-        .fc .fc-timegrid-slot { border-color: var(--color-surface-2); }
-        .fc .fc-scrollgrid, .fc .fc-scrollgrid-section > * { border-color: var(--color-surface-2); }
-        .fc .fc-col-header-cell, .fc .fc-daygrid-day { border-color: var(--color-surface-2); }
-        .fc-theme-standard td, .fc-theme-standard th { border-color: var(--color-surface-2); }
+        .fc .fc-event { cursor: pointer; border-radius: var(--radius-sm); padding: 1px 4px; font-size: 0.75rem; transition: all var(--transition-fast); }
+        .fc .fc-event:hover { box-shadow: var(--glow-sm); }
+        .fc .fc-timegrid-slot { border-color: var(--border-subtle); }
+        .fc .fc-scrollgrid, .fc .fc-scrollgrid-section > * { border-color: var(--border-default); }
+        .fc .fc-col-header-cell, .fc .fc-daygrid-day { border-color: var(--border-default); }
+        .fc-theme-standard td, .fc-theme-standard th { border-color: var(--border-default); }
       `}</style>
       <FullCalendar
         ref={calendarRef}
