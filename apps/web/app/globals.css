@@ -133,6 +133,9 @@ body {
 .text-secondary { color: var(--color-text-secondary); }
 .text-dim { color: var(--color-text-dim); }
 .text-muted { color: var(--color-text-muted); }
+.text-danger { color: var(--color-danger); }
+.text-success { color: var(--color-success); }
+.text-warning { color: var(--color-warning); }
 
 /* Backgrounds */
 .bg-primary { background-color: var(--color-primary); }
@@ -297,6 +300,24 @@ body {
   color: var(--color-text);
 }
 
+.btn-danger {
+  background: var(--color-danger);
+  color: white;
+}
+.btn-danger:hover {
+  background: rgba(209, 29, 0, 0.85);
+  box-shadow: 0 0 8px var(--color-danger-glow);
+}
+
+.btn-success {
+  background: var(--color-success);
+  color: white;
+}
+.btn-success:hover {
+  background: rgba(47, 198, 62, 0.85);
+  box-shadow: 0 0 8px var(--color-success-glow);
+}
+
 /* ═══════════════════════════════════════════════════════════════
    INPUT STYLES
    ═══════════════════════════════════════════════════════════════ */
@@ -357,6 +378,12 @@ body {
   background: rgba(255, 149, 0, 0.1);
   color: var(--color-warning);
   border: 1px solid var(--color-warning);
+}
+
+.badge-info {
+  background: rgba(0, 180, 216, 0.1);
+  color: var(--color-info);
+  border: 1px solid var(--color-info);
 }
 
 /* ═══════════════════════════════════════════════════════════════
