@@ -15,6 +15,7 @@ import { DatabasesModule } from './databases/databases.module';
 import { ChatModule } from './chat/chat.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuthModule } from './auth/auth.module';
+import { SearchModule } from './search/search.module';
 import { NexusAuthGuard } from './auth/auth.guard';
 
 @Module({
@@ -32,6 +33,7 @@ import { NexusAuthGuard } from './auth/auth.guard';
     DatabasesModule,
     ChatModule,
     NotificationsModule,
+    SearchModule,
   ],
   controllers: [AppController],
   providers: [
