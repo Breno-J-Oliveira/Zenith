@@ -87,6 +87,8 @@
   --color-primary-light: var(--color-violet-light);
   --color-primary-glow: var(--color-violet-glow);
   --color-primary-subtle: var(--color-violet-subtle);
+  /* Violet: gradiente de fundo mais discreto */
+  --gradient-primary: linear-gradient(135deg, #6C4CFF 0%, #987BFF 100%);
 }
 
 [data-theme="green"] {
@@ -95,6 +97,46 @@
   --color-primary-light: var(--color-green-light);
   --color-primary-glow: var(--color-green-glow);
   --color-primary-subtle: var(--color-green-subtle);
+  --gradient-primary: linear-gradient(135deg, #00CC44 0%, #00E64D 100%);
+}
+
+/* Tema padrão (red) */
+:root,
+[data-theme="red"] {
+  --gradient-primary: linear-gradient(135deg, #FF2B51 0%, #FF5C79 100%);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LIGHT THEME (preparado para futuro; UI atual usa só dark)
+   ═══════════════════════════════════════════════════════════════ */
+
+[data-theme="light"] {
+  /* Superfícies claras (invertidas do dark) */
+  --color-bg: #FAFAFA;
+  --color-surface-1: #FFFFFF;
+  --color-surface-2: #F0F2F5;
+  --color-surface-3: #E4E7EB;
+  --color-surface-4: #D5D9DE;
+
+  /* Texto escuro */
+  --color-text: #1A1D23;
+  --color-text-secondary: #353A42;
+  --color-text-dim: #5A6672;
+  --color-text-muted: #8899AA;
+
+  /* Bordas */
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-default: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.12);
+
+  /* Sombras mais visíveis em light mode */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+  /* Glo ws mais sutis (para não ofuscar no claro) */
+  --glow-sm: 0 0 12px var(--color-primary-glow);
+  --glow-md: 0 0 20px var(--color-primary-glow);
 }
 
 /* ═══════════════════════════════════════════════════════════════
