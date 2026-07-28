@@ -2,17 +2,40 @@ import {
   Controller, Get, Post, Patch, Delete,
   Body, Param, Query, HttpCode, HttpStatus,
 } from '@nestjs/common';
-import { NotificationsService, CreateNotificationDTO } from './notifications.service';
+import { NotificationsService, CreateNotificationDTO, NotificationType } from './notifications.service';
 import { CurrentUser, ZenithUser } from '../auth/current-user.decorator';
 
 @Controller('notifications')
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
-  /** GET /notifications?unread=true */
+  /** GET /notifications?unread=true&type=reminder */
   @Get()
-  findAll(@CurrentUser() user: ZenithUser, @Query('unread') unread?: string) {
-    return this.notificationsService.findAll(user.id, unread === 'true');
+  findAll(
+    @CurrentUser() user: ZenithUser,
+    @Query('unread') unread?: string,
+    @Query('type') type?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Math.max(1, Math.min(100, parseInt(limit, 10))) : 50;
+    return this.notificationsService.findAll(
+      user.id,
+      unread === 'true',
+      type as NotificationType | undefined,
+      parsedLimit,
+    );
+  }
+
+  /** GET /notifications/count — usado pelo badge do sino */
+  @Get('count')
+  count(@CurrentUser() user: ZenithUser) {
+    return this.notificationsService.count(user.id);
+  }
+
+  /** POST /notifications/auto-check — dispara verificações de rotinas e cria lembretes */
+  @Post('auto-check')
+  autoCheck(@CurrentUser() user: ZenithUser) {
+    return this.notificationsService.notifyTodaysRoutines(user.id);
   }
 
   @Get(':id')
@@ -21,6 +44,7 @@ export class NotificationsController {
   }
 
   @Post()
+  @HttpCode(HttpStatus.CREATED)
   create(@CurrentUser() user: ZenithUser, @Body() dto: CreateNotificationDTO) {
     return this.notificationsService.create(user.id, dto);
   }
@@ -35,15 +59,13 @@ export class NotificationsController {
     return this.notificationsService.markAllAsRead(user.id);
   }
 
-  @Delete('clear')
-  @HttpCode(HttpStatus.OK)
-  clearAll(@CurrentUser() user: ZenithUser) {
-    return this.notificationsService.clearAll(user.id);
-  }
-
   @Delete(':id')
-  @HttpCode(HttpStatus.OK)
   remove(@CurrentUser() user: ZenithUser, @Param('id') id: string) {
     return this.notificationsService.remove(user.id, id);
+  }
+
+  @Delete('clear')
+  clearAll(@CurrentUser() user: ZenithUser) {
+    return this.notificationsService.clearAll(user.id);
   }
 }

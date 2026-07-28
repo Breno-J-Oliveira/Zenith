@@ -7,11 +7,16 @@ interface Notification {
   id: string;
   title: string;
   body: string;
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error' | 'reminder';
   read: boolean;
   relatedType?: string;
   relatedId?: string;
   createdAt: string;
+}
+interface NotificationCount {
+  total: number;
+  unread: number;
+  byType: Record<string, number>;
 }
 
 export function NotificationPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -83,6 +88,7 @@ export function NotificationPanel({ isOpen, onClose }: { isOpen: boolean; onClos
       case 'success': return '✅';
       case 'warning': return '⚠️';
       case 'error': return '❌';
+      case 'reminder': return '🔔';
       default: return 'ℹ️';
     }
   };
@@ -92,6 +98,7 @@ export function NotificationPanel({ isOpen, onClose }: { isOpen: boolean; onClos
       case 'success': return 'bg-[var(--color-success-glow)] text-[var(--color-success)] border-[var(--color-success)]/30';
       case 'warning': return 'bg-[var(--color-warning-glow)] text-[var(--color-warning)] border-[var(--color-warning)]/30';
       case 'error': return 'bg-[var(--color-danger-glow)] text-[var(--color-danger)] border-[var(--color-danger)]/30';
+      case 'reminder': return 'bg-[var(--color-primary-subtle)] text-[var(--color-primary)] border-[var(--color-primary)]/30';
       default: return 'bg-[var(--color-info-glow)] text-[var(--color-info)] border-[var(--color-info)]/30';
     }
   };
