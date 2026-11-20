@@ -1,5 +1,7 @@
 'use client';
 
+// Necessário para export estático — useSearchParams precisa de Suspense boundary
+import { Suspense } from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
@@ -63,7 +65,7 @@ function calcProgress(goal: Goal): number {
   return Math.round((done / items.length) * 100);
 }
 
-export default function MetasPage() {
+function MetasPageContent() {
   const searchParams = useSearchParams();
 
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -375,5 +377,13 @@ export default function MetasPage() {
         )}
       </div>
     </ShellLayout>
+  );
+}
+
+export default function MetasPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"><p className="text-[var(--color-text-dim)]">Carregando...</p></div>}>
+      <MetasPageContent />
+    </Suspense>
   );
 }

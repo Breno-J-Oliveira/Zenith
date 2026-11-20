@@ -1,7 +1,10 @@
 'use client';
 
+// Necessário para export estático — useSearchParams precisa de Suspense boundary
+import { Suspense } from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { getCivilDate, getCivilTime, ZENITH_TIME_ZONE } from '../../../../packages/shared/src/civil-date';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import { EventBadge } from '../../components/calendar/EventBadge';
 import { apiGet, apiPatch } from '@/lib/api';
@@ -20,7 +23,7 @@ interface Briefing {
   source: 'gemini' | 'template';
 }
 
-export default function HojePage() {
+function HojePageContent() {
   const searchParams = useSearchParams();
   const showNewTaskModal = searchParams.get('new') === 'true';
 
@@ -34,7 +37,7 @@ export default function HojePage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = getCivilDate();
       const [events, briefingData] = await Promise.all([
         apiGet<any[]>(`/calendar?from=${today}&to=${today}`),
         apiGet<any>('/ai/briefing'),
@@ -70,7 +73,7 @@ export default function HojePage() {
   };
 
   const now = new Date();
-  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const currentTime = getCivilTime(now);
   const completedCount = items.filter(i => i.done).length;
   const totalCount = items.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
@@ -101,7 +104,7 @@ export default function HojePage() {
             <div>
               <h1 className="font-orbitron text-2xl font-bold text-[var(--color-text)]">Hoje</h1>
               <p className="text-[var(--color-text-dim)] text-sm">
-                {now.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                {now.toLocaleDateString('pt-BR', { timeZone: ZENITH_TIME_ZONE, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               </p>
             </div>
           </div>
@@ -318,5 +321,13 @@ export default function HojePage() {
         )}
       </div>
     </ShellLayout>
+  );
+}
+
+export default function HojePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"><p className="text-[var(--color-text-dim)]">Carregando...</p></div>}>
+      <HojePageContent />
+    </Suspense>
   );
 }

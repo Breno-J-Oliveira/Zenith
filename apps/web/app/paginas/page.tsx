@@ -1,5 +1,7 @@
 'use client';
 
+// Necessário para export estático — useSearchParams precisa de Suspense boundary
+import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
@@ -17,7 +19,7 @@ interface PageItem {
   updatedAt: string;
 }
 
-export default function PaginasPage() {
+function PaginasPageContent() {
   const searchParams = useSearchParams();
   const [pages, setPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +107,14 @@ export default function PaginasPage() {
         )}
       </div>
     </ShellLayout>
+  );
+}
+
+export default function PaginasPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"><p className="text-[var(--color-text-dim)]">Carregando...</p></div>}>
+      <PaginasPageContent />
+    </Suspense>
   );
 }
 

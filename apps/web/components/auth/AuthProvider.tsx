@@ -87,6 +87,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const saveTokensSafe = useCallback((tokens: AuthTokens | null) => {
     saveTokens(tokens ? JSON.stringify(tokens) : null);
+    if (typeof document !== 'undefined') {
+      // O middleware usa apenas o marcador. A API valida o JWT em cada rota.
+      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
+      document.cookie = tokens
+        ? `zenith_auth=authenticated; Path=/; SameSite=Lax${secure}`
+        : `zenith_auth=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
+    }
   }, []);
 
   const clearAuth = useCallback(() => {
@@ -133,19 +140,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const scheduleRefresh = useCallback(
     (tokens: AuthTokens) => {
       try {
-        const payload = JSON.parse(atob(tokens.accessToken.split('.')[1]));
+        const payloadText = tokens.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const payload = JSON.parse(atob(payloadText));
         const expMs = payload.exp * 1000;
         const delay = expMs - Date.now() - REFRESH_THRESHOLD_MS;
         if (delay <= 0) return;
 
         const timeoutId = setTimeout(async () => {
+          const isCurrentSession = () => loadTokensSafe()?.refreshToken === tokens.refreshToken;
+          if (!isCurrentSession()) return;
           try {
             const newTokens = await clientRef.current.refresh(tokens.refreshToken);
+            if (!isCurrentSession()) return;
             saveTokensSafe(newTokens);
             setState((prev) => ({ ...prev, tokens: newTokens }));
             scheduleRefresh(newTokens);
           } catch {
-            clearAuth();
+            if (isCurrentSession()) clearAuth();
           }
         }, delay);
         return () => clearTimeout(timeoutId);
@@ -153,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Token malformado
       }
     },
-    [saveTokensSafe, clearAuth],
+    [loadTokensSafe, saveTokensSafe, clearAuth],
   );
 
   // ─── Ações públicas ───────────────────────────────────────────
@@ -163,8 +174,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         const tokens = await clientRef.current.login({ email, password });
-        saveTokensSafe(tokens);
         const user = await fetchZenithUser(tokens.accessToken);
+        if (!user) {
+          throw new Error('O Zenith não conseguiu confirmar a sessão. Tente entrar novamente.');
+        }
+        saveTokensSafe(tokens);
         setState({
           user,
           tokens,
@@ -173,7 +187,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: null,
         });
         scheduleRefresh(tokens);
-        router.push('/dashboard');
       } catch (err) {
         const message =
           err instanceof NexusAuthError ? err.message : (err as Error)?.message || 'Login falhou';
@@ -187,7 +200,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw err;
       }
     },
-    [fetchZenithUser, saveTokensSafe, scheduleRefresh, router],
+    [fetchZenithUser, saveTokensSafe, scheduleRefresh],
   );
 
   const register = useCallback(
@@ -242,21 +255,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const tokens = loadTokensSafe();
     if (!tokens) {
+      saveTokensSafe(null);
       setState((prev) => ({ ...prev, loading: false }));
       return;
     }
     refreshUser();
     const cleanup = scheduleRefresh(tokens);
     return cleanup;
-  }, [loadTokensSafe, refreshUser, scheduleRefresh]);
+  }, [loadTokensSafe, refreshUser, saveTokensSafe, scheduleRefresh]);
 
   // Redireciona para /login se não autenticado e tentar aceder a rota protegida
   useEffect(() => {
     if (state.loading) return;
-    const isAuthRoute = pathname?.startsWith('/login') || pathname?.startsWith('/register');
-    const isPublicRoute = pathname === '/';
-    if (!state.isAuthenticated && !isAuthRoute && !isPublicRoute) {
-      router.push('/login');
+    const isPublicRoute = pathname === '/' ||
+      /^\/(login|register|forgot-password|reset-password|verify-email|auth\/callback)(\/|$)/.test(pathname ?? '');
+    if (!state.isAuthenticated && !isPublicRoute) {
+      const next = window.location.pathname + window.location.search;
+      router.replace(`/login/?next=${encodeURIComponent(next)}`);
     }
   }, [state.loading, state.isAuthenticated, pathname, router]);
 

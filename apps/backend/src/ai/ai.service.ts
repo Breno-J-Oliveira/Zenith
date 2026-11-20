@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getCivilDate } from '../../../../packages/shared/src/civil-date';
 import { aiProvider } from '../../../../packages/shared/src/ai';
-import { ParsedAIResult, AILogEntry, RoutinePayload, AppointmentPayload, ReorganizationResult } from '../../../../packages/shared/src/types';
+import { ParsedAIResult, AILogEntry, RoutinePayload, AppointmentPayload } from '../../../../packages/shared/src/types';
 import { GeminiProvider } from './gemini.provider';
 import { GoalsService } from '../goals/goals.service';
 import { RoutinesService } from '../routines/routines.service';
 import { SchedulerService } from '../scheduler/scheduler.service';
-import { PrismaService, MOCK_USER_ID } from '../prisma.service';
+import { PrismaService } from '../prisma.service';
 
 @Injectable()
 export class AIService {
@@ -27,7 +27,7 @@ export class AIService {
     }
   }
 
-  async parse(text: string): Promise<ParsedAIResult & { source: 'gemini' | 'mock'; sideEffect?: any }> {
+  async parse(userId: string, text: string): Promise<ParsedAIResult & { source: 'gemini' | 'mock'; sideEffect?: any }> {
     let result: ParsedAIResult;
     let source: 'gemini' | 'mock' = 'gemini';
 
@@ -48,7 +48,7 @@ export class AIService {
 
     if (result.intent === 'CREATE_ROUTINE' && result.payload) {
       const payload = result.payload as RoutinePayload;
-      const routine = await this.routinesService.create(MOCK_USER_ID, {
+      const routine = await this.routinesService.create(userId, {
         title: payload.title,
         frequency: payload.frequency,
         time: payload.time,
@@ -59,7 +59,7 @@ export class AIService {
 
     if (result.intent === 'CREATE_APPOINTMENT' && result.payload) {
       const payload = result.payload as AppointmentPayload;
-      const reorgResult = await this.schedulerService.createAppointment(MOCK_USER_ID, {
+      const reorgResult = await this.schedulerService.createAppointment(userId, {
         title: payload.title,
         date: payload.date,
         startTime: payload.startTime,
@@ -70,7 +70,7 @@ export class AIService {
 
     await this.prisma.aILog.create({
       data: {
-        userId: MOCK_USER_ID,
+        userId,
         input: text,
         result: JSON.stringify(result),
       },
@@ -79,9 +79,9 @@ export class AIService {
     return { ...result, source, sideEffect };
   }
 
-  async getLog(): Promise<AILogEntry[]> {
+  async getLog(userId: string): Promise<AILogEntry[]> {
     const records = await this.prisma.aILog.findMany({
-      where: { userId: MOCK_USER_ID },
+      where: { userId },
       orderBy: { timestamp: 'desc' },
       take: 50,
     });
@@ -93,14 +93,14 @@ export class AIService {
     }));
   }
 
-  async getBriefing(): Promise<{ text: string; source: 'gemini' | 'template' }> {
-    const today = new Date().toISOString().split('T')[0];
+  async getBriefing(userId: string): Promise<{ text: string; source: 'gemini' | 'template' }> {
+    const today = getCivilDate();
 
-    const goals = await this.goalsService.findAll(MOCK_USER_ID);
-    const routineTasks = await this.routinesService.getTasksForDate(MOCK_USER_ID, today);
-    const goalTasks = await this.goalsService.getTasks(MOCK_USER_ID);
+    const goals = await this.goalsService.findAll(userId);
+    const routineTasks = await this.routinesService.getTasksForDate(userId, today);
+    const goalTasks = await this.goalsService.getTasks(userId);
     const todayGoalTasks = goalTasks.filter(t => t.date === today);
-    const appointments = await this.schedulerService.findAll(MOCK_USER_ID);
+    const appointments = await this.schedulerService.findAll(userId);
     const todayAppointments = appointments.filter(a => a.date === today);
 
     const allTodayItems = [
@@ -109,12 +109,12 @@ export class AIService {
       ...todayAppointments.map(a => ({ title: a.title, time: `${a.startTime}-${a.endTime}`, type: 'compromisso' })),
     ].sort((a, b) => a.time.localeCompare(b.time));
 
-    const activeRoutines = await this.routinesService.findAll(MOCK_USER_ID);
+    const activeRoutines = await this.routinesService.findAll(userId);
 
     const goalProgress = await Promise.all(
       goals.map(async g => ({
         title: g.title,
-        progress: await this.goalsService.getProgress(MOCK_USER_ID, g.id),
+        progress: await this.goalsService.getProgress(userId, g.id),
       }))
     );
 

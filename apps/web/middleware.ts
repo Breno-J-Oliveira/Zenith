@@ -39,7 +39,10 @@ const PUBLIC_PREFIXES = [
 ];
 
 function isPublicRoute(pathname: string): boolean {
-  if (PUBLIC_ROUTES.includes(pathname)) return true;
+  const normalizedPath = pathname.endsWith('/') && pathname.length > 1
+    ? pathname.slice(0, -1)
+    : pathname;
+  if (PUBLIC_ROUTES.includes(normalizedPath)) return true;
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
@@ -59,8 +62,8 @@ export function middleware(request: NextRequest) {
 
   if (!authCookie) {
     // Não autenticado — redireciona para /login com callback
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('next', pathname);
+    const loginUrl = new URL('/login/', request.url);
+    loginUrl.searchParams.set('next', pathname + request.nextUrl.search);
     return NextResponse.redirect(loginUrl);
   }
 

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { civilDateAnchor, getCivilDate } from '../../../../packages/shared/src/civil-date';
 import { PrismaService } from '../prisma.service';
 import {
   Routine, CreateRoutineDTO, UpdateRoutineDTO,
@@ -66,21 +67,18 @@ export class RoutinesService {
   async generateTasks(userId: string, routineId: string, days: number = 7): Promise<Task[]> {
     const routine = await this.findOne(userId, routineId); // ownership
     const tasks: Task[] = [];
-    const now = new Date();
+    const date = civilDateAnchor(getCivilDate());
+    const createdDate = civilDateAnchor(getCivilDate(new Date(routine.createdAt)));
 
-    for (let i = 0; i < days; i++) {
-      const date = new Date(now);
-      date.setDate(date.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0];
-
+    for (let i = 0; i < days; i++, date.setUTCDate(date.getUTCDate() + 1)) {
+      const dateStr = date.toISOString().slice(0, 10);
       let shouldGenerate = false;
       if (routine.frequency === 'daily') {
         shouldGenerate = true;
       } else if (routine.frequency === 'weekly') {
-        const createdDate = new Date(routine.createdAt);
-        shouldGenerate = date.getDay() === createdDate.getDay();
+        shouldGenerate = date.getUTCDay() === createdDate.getUTCDay();
       } else if (routine.frequency === 'monthly') {
-        shouldGenerate = date.getDate() === new Date(routine.createdAt).getDate();
+        shouldGenerate = date.getUTCDate() === createdDate.getUTCDate();
       }
 
       if (shouldGenerate) {

@@ -5,6 +5,7 @@ node_modules/
 
 # ─── Build & Output ─────────────────────────────────────────
 .next/
+.next-zenith-test/
 out/
 build/
 dist/
@@ -72,3 +73,8 @@ redis_data/
 
 # ─── NexusAuth repo separado (não commitar no Zenith) ─────
 NexusAuth/
+
+# ─── Tauri Desktop (apps/web/src-tauri) ────────────────────
+src-tauri/target/
+src-tauri/.cargo/
+src-tauri/generate-icons.js

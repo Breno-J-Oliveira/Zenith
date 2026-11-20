@@ -1,27 +1,34 @@
 import type { Metadata } from 'next'
-import { Orbitron, Space_Mono, Rajdhani } from 'next/font/google'
+import localFont from 'next/font/local'
 import './globals.css'
 import { AuthProvider } from '../components/auth/AuthProvider'
 import { AuthEventsListener } from '../components/auth/AuthEventsListener'
 
-const orbitron = Orbitron({
-  subsets: ['latin'],
+const orbitron = localFont({
+  src: [{ path: './fonts/orbitron-400-900.woff2', weight: '400 900' }],
   variable: '--font-orbitron',
   display: 'swap',
   fallback: ['system-ui', 'sans-serif'],
 })
 
-const spaceMono = Space_Mono({
-  subsets: ['latin'],
-  weight: ['400', '700'],
+const spaceMono = localFont({
+  src: [
+    { path: './fonts/spacemono-400.woff2', weight: '400' },
+    { path: './fonts/spacemono-700.woff2', weight: '700' },
+  ],
   variable: '--font-space-mono',
   display: 'swap',
   fallback: ['ui-monospace', 'SFMono-Regular', 'monospace'],
 })
 
-const rajdhani = Rajdhani({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+const rajdhani = localFont({
+  src: [
+    { path: './fonts/rajdhani-300.woff2', weight: '300' },
+    { path: './fonts/rajdhani-400.woff2', weight: '400' },
+    { path: './fonts/rajdhani-500.woff2', weight: '500' },
+    { path: './fonts/rajdhani-600.woff2', weight: '600' },
+    { path: './fonts/rajdhani-700.woff2', weight: '700' },
+  ],
   variable: '--font-rajdhani',
   display: 'swap',
   fallback: ['system-ui', 'sans-serif'],

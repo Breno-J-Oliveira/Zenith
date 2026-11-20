@@ -41,6 +41,8 @@ interface FetchOptions extends Omit<RequestInit, 'body'> {
   json?: boolean;
   /** Quando true, NÃO envia o Bearer token (útil para endpoints públicos) */
   skipAuth?: boolean;
+  /** Query params adicionados à URL */
+  params?: Record<string, string | number | boolean | undefined>;
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | boolean | undefined>) {

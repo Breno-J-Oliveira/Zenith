@@ -1,14 +1,14 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { promises as fs } from 'fs';
 import { join } from 'path';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 
 /**
  * UploadsService — armazena arquivos enviados pelos usuários.
  *
  * Implementação simples baseada em filesystem (sem dependência de S3/Cloudinary
  * por enquanto). Os arquivos são salvos em `apps/backend/uploads/` com nome
- * aleatório + extensão original. A URL pública segue o padrão
+ * aleatório por conta. A URL autenticada segue o padrão
  * `GET /uploads/:filename` servida pelo UploadsController.
  *
  * Validações:
@@ -17,24 +17,17 @@ import { randomBytes } from 'crypto';
  */
 @Injectable()
 export class UploadsService {
-  private readonly logger = new Logger(UploadsService.name);
   private readonly uploadDir = join(process.cwd(), 'apps', 'backend', 'uploads');
   private readonly maxSizeBytes = 10 * 1024 * 1024; // 10MB
   private readonly allowedTypes = /^image\/(jpeg|png|gif|webp|svg\+xml)$|^application\/pdf$/;
 
-  /**
-   * Garante que o diretório de uploads existe.
-   */
-  private async ensureDir(): Promise<void> {
-    try {
-      await fs.access(this.uploadDir);
-    } catch {
-      await fs.mkdir(this.uploadDir, { recursive: true });
-    }
+  private directoryFor(userId: string): string {
+    const owner = createHash('sha256').update(userId).digest('hex');
+    return join(this.uploadDir, owner);
   }
 
   /**
-   * Salva um arquivo (Buffer) no filesystem e retorna a URL pública.
+   * Salva um arquivo por conta e retorna a URL autenticada.
    */
   async saveFile(
     userId: string,
@@ -51,16 +44,14 @@ export class UploadsService {
       throw new BadRequestException(`Tipo não permitido: ${mimeType}. Permitidos: imagens e PDF.`);
     }
 
-    await this.ensureDir();
-
-    // Gera nome único: timestamp + random + extensão
-    const ext = originalName.includes('.') ? originalName.split('.').pop() : 'bin';
+    const directory = this.directoryFor(userId);
+    await fs.mkdir(directory, { recursive: true });
+    const ext = originalName.match(/\.([a-z0-9]{1,8})$/i)?.[1].toLowerCase() ?? 'bin';
     const hash = randomBytes(8).toString('hex');
     const filename = `${Date.now()}-${hash}.${ext}`;
-    const fullPath = join(this.uploadDir, filename);
+    const fullPath = join(directory, filename);
 
     await fs.writeFile(fullPath, buffer);
-    this.logger.log(`Upload salvo: ${filename} (${(buffer.length / 1024).toFixed(1)}KB) por user ${userId}`);
 
     return {
       url: `/uploads/${filename}`,
@@ -73,13 +64,14 @@ export class UploadsService {
   /**
    * Lê um arquivo do filesystem (para servir via endpoint estático).
    */
-  async readFile(filename: string): Promise<{ buffer: Buffer; mimeType: string }> {
-    // Sanitização: não aceitar paths com ../
-    if (filename.includes('..') || filename.includes('/')) {
-      throw new BadRequestException('Filename inválido');
+  async readFile(userId: string, filename: string): Promise<{ buffer: Buffer; mimeType: string }> {
+    if (!/^\d+-[a-f0-9]{16}\.[a-z0-9]{1,8}$/.test(filename)) {
+      throw new NotFoundException('Arquivo não encontrado');
     }
-    const fullPath = join(this.uploadDir, filename);
-    const buffer = await fs.readFile(fullPath);
+    const buffer = await fs.readFile(join(this.directoryFor(userId), filename)).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === 'ENOENT') throw new NotFoundException('Arquivo não encontrado');
+      throw error;
+    });
     const ext = filename.split('.').pop()?.toLowerCase();
     const mimeType =
       ext === 'png' ? 'image/png' :

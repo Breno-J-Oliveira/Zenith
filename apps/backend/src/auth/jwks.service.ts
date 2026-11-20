@@ -48,7 +48,6 @@ export class JwksService implements OnModuleInit {
   private nexusAuthUrl: string = '';
   private jwksUri: string = '';
   private jwtIssuer: string = 'nexusauth';
-  private skipValidation: boolean = false;
 
   constructor(private readonly config: ConfigService) {}
 
@@ -58,15 +57,6 @@ export class JwksService implements OnModuleInit {
     ).replace(/\/$/, '');
     this.jwksUri = `${this.nexusAuthUrl}/.well-known/jwks.json`;
     this.jwtIssuer = this.config.get<string>('NEXUS_JWT_ISSUER') || 'nexusauth';
-    this.skipValidation = this.config.get<string>('NEXUS_AUTH_SKIP_VALIDATION') === 'true';
-
-    if (this.skipValidation) {
-      this.logger.warn(
-        '⚠️  NEXUS_AUTH_SKIP_VALIDATION=true — JWT validation DESATIVADA. ' +
-        'Apenas para desenvolvimento. NUNCA use em produção.',
-      );
-      return;
-    }
 
     // Pré-carrega as chaves em background — não bloqueia o startup
     this.refreshKeys().catch((err) => {
@@ -81,18 +71,6 @@ export class JwksService implements OnModuleInit {
    * Valida um JWT e retorna o payload. Lança erro se inválido.
    */
   async verifyToken(token: string): Promise<NexusJwtPayload> {
-    if (this.skipValidation) {
-      // Modo dev: extrai payload sem verificar assinatura
-      try {
-        const parts = token.split('.');
-        if (parts.length !== 3) throw new Error('Token malformado');
-        const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
-        return payload as NexusJwtPayload;
-      } catch {
-        throw new Error('Token inválido (modo skip)');
-      }
-    }
-
     const parts = token.split('.');
     if (parts.length !== 3) throw new Error('JWT malformado');
     const headerB64 = parts[0];
@@ -118,8 +96,12 @@ export class JwksService implements OnModuleInit {
     if (payload.iss !== this.jwtIssuer) {
       throw new Error(`Issuer inválido: ${payload.iss}`);
     }
-    if (payload.exp * 1000 < Date.now()) {
+    if (!Number.isFinite(payload.exp) || payload.exp * 1000 <= Date.now()) {
       throw new Error('Token expirado');
+    }
+    if (typeof payload.sub !== 'string' || !payload.sub.trim() ||
+        typeof payload.email !== 'string' || !payload.email.trim()) {
+      throw new Error('Identidade ausente no token');
     }
     if (payload.type !== 'access' && payload.type !== 'impersonation') {
       throw new Error(`Tipo de token inválido: ${payload.type}`);

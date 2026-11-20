@@ -1,11 +1,25 @@
 'use client';
 
+// Necessário para export estático — useSearchParams precisa de Suspense boundary
+import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../components/auth/AuthProvider';
 
-export default function LoginPage() {
+function loginDestination(next: string | null): string {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) {
+    return '/dashboard/';
+  }
+  const target = new URL(next, 'http://zenith.local');
+  if (target.origin !== 'http://zenith.local' || target.pathname.startsWith('//') ||
+      /^\/login\/?$/.test(target.pathname)) {
+    return '/dashboard/';
+  }
+  return target.pathname + target.search + target.hash;
+}
+
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, isAuthenticated, loading, error, nexusHealthy, nexusAuthUrl } = useAuth();
@@ -19,8 +33,7 @@ export default function LoginPage() {
   // Se já está autenticado, redireciona para o destino
   useEffect(() => {
     if (!loading && isAuthenticated) {
-      const next = searchParams.get('next') || '/dashboard';
-      router.push(next);
+      router.replace(loginDestination(searchParams.get('next')));
     }
   }, [loading, isAuthenticated, router, searchParams]);
 
@@ -75,17 +88,16 @@ export default function LoginPage() {
               <br />
               Verifica se o NexusAuth está a correr em{' '}
               <code className="font-mono">{nexusAuthUrl}</code>.
-              <br />
-              Em dev, define <code className="font-mono">NEXUS_AUTH_SKIP_VALIDATION=true</code> no backend.
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">
+              <label htmlFor="login-email" className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">
                 EMAIL
               </label>
               <input
+                id="login-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -100,20 +112,19 @@ export default function LoginPage() {
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider">
+                <label htmlFor="login-password" className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider">
                   PASSWORD
                 </label>
-                <a
-                  href={`${nexusAuthUrl}/auth/forgot-password`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <Link
+                  href="/forgot-password/"
                   className="text-[10px] text-[var(--color-text-dim)] hover:text-[var(--color-primary)] transition-colors"
                 >
                   Esqueceste-te?
-                </a>
+                </Link>
               </div>
               <div className="relative">
                 <input
+                  id="login-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -195,5 +206,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"><p className="text-[var(--color-text-dim)]">Carregando...</p></div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

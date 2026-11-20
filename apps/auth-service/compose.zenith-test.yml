@@ -1,0 +1,23 @@
+# Use com docker-compose.yml e um projeto Compose exclusivo de teste.
+services:
+  postgres:
+    container_name: !reset null
+    restart: "no"
+    volumes: !reset []
+    tmpfs:
+      - /var/lib/postgresql/data
+    environment:
+      POSTGRES_INITDB_ARGS: --no-sync
+  redis:
+    container_name: !reset null
+    restart: "no"
+  api:
+    container_name: !reset null
+    restart: "no"
+    ports: !override
+      - "127.0.0.1:3100:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      REQUIRE_EMAIL_VERIFIED: "false"
+      CORS_ORIGINS: http://localhost:3101

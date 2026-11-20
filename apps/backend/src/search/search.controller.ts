@@ -1,6 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { CurrentUser, ZenithUser } from '../auth/current-user.decorator';
-import { MOCK_USER_ID } from '../prisma.service';
 import { SearchService, SearchHitType } from './search.service';
 
 @Controller('search')
@@ -14,12 +13,11 @@ export class SearchController {
    * compromissos e linhas de database. Retorna resultados agrupados
    * por tipo, ordenados por relevância.
    *
-   * Endpoint público (precisa de JWT) — usado pelo GlobalSearch do
-   * frontend e pela tool `search` do AgentService.
+   * Requer JWT — usado pelo GlobalSearch e pela tool `search` do AgentService.
    */
   @Get()
   async search(
-    @CurrentUser() _user: ZenithUser,
+    @CurrentUser() user: ZenithUser,
     @Query('q') q: string,
     @Query('types') types?: string,
     @Query('limit') limit?: string,
@@ -28,8 +26,6 @@ export class SearchController {
       ? (types.split(',').filter((t) => t.trim()) as SearchHitType[])
       : undefined;
     const parsedLimit = limit ? Math.max(1, Math.min(50, parseInt(limit, 10))) : 10;
-    // TODO: trocar para _user.id quando auth real cobrir todos os endpoints.
-    // Por enquanto os dados são criados com MOCK_USER_ID.
-    return this.searchService.search(MOCK_USER_ID, q || '', parsedTypes, parsedLimit);
+    return this.searchService.search(user.id, q || '', parsedTypes, parsedLimit);
   }
 }

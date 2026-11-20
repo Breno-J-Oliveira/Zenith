@@ -1,5 +1,5 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService, MOCK_USER_ID } from '../prisma.service';
+import { PrismaService } from '../prisma.service';
 import { AgentService } from './agent.service';
 
 /**
@@ -12,9 +12,7 @@ import { AgentService } from './agent.service';
  *  - Conversão do histórico (Prisma) para o formato esperado pelo Gemini
  *  - Delegar o processamento para o AgentService
  *
- * MOCK_USER_ID é usado por enquanto — quando o auth real cobrir o chat,
- * basta passar `user.id` para o AgentService (que já recebe o userId no
- * `executeTool`).
+ * Usa a identidade autenticada em todo o fluxo da conversa.
  */
 @Injectable()
 export class ChatService {
@@ -27,9 +25,9 @@ export class ChatService {
 
   // ─── THREADS ──────────────────────────────────────────────
 
-  async getThreads() {
+  async getThreads(userId: string) {
     return this.prisma.chatThread.findMany({
-      where: { userId: MOCK_USER_ID },
+      where: { userId },
       include: {
         messages: {
           orderBy: { createdAt: 'asc' },
@@ -41,9 +39,9 @@ export class ChatService {
     });
   }
 
-  async getThread(id: string) {
+  async getThread(userId: string, id: string) {
     const thread = await this.prisma.chatThread.findFirst({
-      where: { id, userId: MOCK_USER_ID },
+      where: { id, userId },
       include: {
         messages: { orderBy: { createdAt: 'asc' } },
       },
@@ -52,19 +50,19 @@ export class ChatService {
     return thread;
   }
 
-  async createThread(title?: string) {
+  async createThread(userId: string, title?: string) {
     return this.prisma.chatThread.create({
       data: {
-        userId: MOCK_USER_ID,
+        userId,
         title: title || 'Nova conversa',
       },
     });
   }
 
-  async deleteThread(id: string) {
+  async deleteThread(userId: string, id: string) {
     // Verifica ownership antes de deletar
     const thread = await this.prisma.chatThread.findFirst({
-      where: { id, userId: MOCK_USER_ID },
+      where: { id, userId },
     });
     if (!thread) throw new NotFoundException('Thread não encontrada');
     return this.prisma.chatThread.delete({ where: { id } });
@@ -72,9 +70,9 @@ export class ChatService {
 
   // ─── MENSAGENS ────────────────────────────────────────────
 
-  async sendMessage(threadId: string, content: string) {
+  async sendMessage(userId: string, threadId: string, content: string) {
     // 1. Buscar thread + histórico (precisa para enviar ao Gemini)
-    const thread = await this.getThread(threadId);
+    const thread = await this.getThread(userId, threadId);
 
     // 2. Salvar mensagem do usuário
     const userMessage = await this.prisma.chatMessage.create({
@@ -106,7 +104,7 @@ export class ChatService {
       if (trimmed.length > 4000) {
         throw new BadRequestException('Mensagem muito longa (máx 4000 caracteres)');
       }
-      result = await this.agentService.process(trimmed, history);
+      result = await this.agentService.process(userId, trimmed, history);
     } catch (err: any) {
       // Se for BadRequest, propaga para o controller retornar 400
       if (err?.status === 400) throw err;

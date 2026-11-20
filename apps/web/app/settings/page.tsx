@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { ShellLayout } from '../../components/layout/ShellLayout';
+import { API } from '../../lib/api';
 
 export default function SettingsPage() {
   const [theme, setTheme] = useState('red');
@@ -17,6 +18,10 @@ export default function SettingsPage() {
   });
   const [language, setLanguage] = useState('pt-BR');
   const [timezone, setTimezone] = useState('America/Sao_Paulo');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [exporting, setExporting] = useState<'json' | 'csv' | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleThemeChange = (newTheme: string) => {
     setTheme(newTheme);
@@ -35,23 +40,82 @@ export default function SettingsPage() {
     { id: 'green', label: 'Green', color: '#00CC44', description: 'Crescimento e equilíbrio' },
   ];
 
-  const handleExportData = () => {
-    const data = {
-      name,
-      email,
-      theme,
-      language,
-      timezone,
-      notifications,
-      exportDate: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `zenith-export-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleExportJson = async () => {
+    setExporting('json');
+    try {
+      const res = await fetch(`${API}/export/json`, {
+        headers: { Accept: 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`Erro ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zenith-export-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(`Erro ao exportar: ${err.message}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleExportCsv = async () => {
+    setExporting('csv');
+    try {
+      const res = await fetch(`${API}/export/csv`, {
+        headers: { Accept: 'text/csv' },
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error(`Erro ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zenith-export-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(`Erro ao exportar: ${err.message}`);
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`${API}/export/import`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: `Erro ${res.status}` }));
+        throw new Error(err.message || `Erro ${res.status}`);
+      }
+      const result = await res.json();
+      const counts = Object.entries(result.counts || {})
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(', ');
+      setImportResult(`Importado com sucesso! ${counts}`);
+    } catch (err: any) {
+      setImportResult(`Erro: ${err.message}`);
+    } finally {
+      setImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   return (
@@ -303,8 +367,9 @@ export default function SettingsPage() {
 
           <div className="space-y-3">
             <button
-              onClick={handleExportData}
-              className="w-full flex items-center justify-between p-4 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-default)] hover:border-[var(--color-primary)]/50 transition-all group"
+              onClick={handleExportJson}
+              disabled={exporting !== null}
+              className="w-full flex items-center justify-between p-4 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-default)] hover:border-[var(--color-primary)]/50 transition-all group disabled:opacity-50"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-[var(--color-surface-2)] group-hover:bg-[var(--color-primary-subtle)] transition-colors">
@@ -314,8 +379,10 @@ export default function SettingsPage() {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-medium text-[var(--color-text)]">Exportar dados</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">Baixe seus dados em formato JSON</p>
+                  <p className="text-sm font-medium text-[var(--color-text)]">
+                    {exporting === 'json' ? 'Exportando...' : 'Exportar como JSON'}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">Baixe todos os seus dados completos</p>
                 </div>
               </div>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--color-text-muted)] group-hover:text-[var(--color-primary)] transition-colors">
@@ -324,7 +391,33 @@ export default function SettingsPage() {
             </button>
 
             <button
-              className="w-full flex items-center justify-between p-4 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-default)] hover:border-[var(--color-primary)]/50 transition-all group"
+              onClick={handleExportCsv}
+              disabled={exporting !== null}
+              className="w-full flex items-center justify-between p-4 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-default)] hover:border-[var(--color-primary)]/50 transition-all group disabled:opacity-50"
+            >
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-[var(--color-surface-2)] group-hover:bg-[var(--color-primary-subtle)] transition-colors">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                </div>
+                <div className="text-left">
+                  <p className="text-sm font-medium text-[var(--color-text)]">
+                    {exporting === 'csv' ? 'Exportando...' : 'Exportar como CSV'}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">Apenas dados tabulares dos databases</p>
+                </div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--color-text-muted)] group-hover:text-[var(--color-primary)] transition-colors">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+
+            <button
+              onClick={handleImportClick}
+              disabled={importing}
+              className="w-full flex items-center justify-between p-4 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-default)] hover:border-[var(--color-primary)]/50 transition-all group disabled:opacity-50"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-[var(--color-surface-2)] group-hover:bg-[var(--color-primary-subtle)] transition-colors">
@@ -335,15 +428,36 @@ export default function SettingsPage() {
                   </svg>
                 </div>
                 <div className="text-left">
-                  <p className="text-sm font-medium text-[var(--color-text)]">Importar dados</p>
-                  <p className="text-xs text-[var(--color-text-muted)]">Restaure dados de um backup</p>
+                  <p className="text-sm font-medium text-[var(--color-text)]">
+                    {importing ? 'Importando...' : 'Importar dados'}
+                  </p>
+                  <p className="text-xs text-[var(--color-text-muted)]">Restaure dados de um backup JSON ou CSV</p>
                 </div>
               </div>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--color-text-muted)] group-hover:text-[var(--color-primary)] transition-colors">
                 <polyline points="9 18 15 12 9 6" />
               </svg>
             </button>
+
+            {importResult && (
+              <div className={`p-3 rounded-lg text-sm ${
+                importResult.startsWith('Erro')
+                  ? 'bg-[var(--color-danger-glow)] text-[var(--color-danger)]'
+                  : 'bg-[var(--color-success-glow)] text-[var(--color-success)]'
+              }`}>
+                {importResult}
+              </div>
+            )}
           </div>
+
+          {/* Hidden file input for import */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json,.csv"
+            onChange={handleFileChange}
+            className="hidden"
+          />
         </div>
 
         {/* About */}
@@ -362,38 +476,23 @@ export default function SettingsPage() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b border-[var(--border-subtle)]">
               <span className="text-[var(--color-text-dim)]">Versão</span>
-              <span className="text-[var(--color-text)] font-mono">0.8.0</span>
+              <span className="text-[var(--color-text)] font-mono">0.16.0</span>
             </div>
             <div className="flex justify-between py-2 border-b border-[var(--border-subtle)]">
               <span className="text-[var(--color-text-dim)]">Fase atual</span>
-              <span className="text-[var(--color-primary)] font-mono">Fase 8</span>
+              <span className="text-[var(--color-primary)] font-mono">Fase 16</span>
             </div>
             <div className="flex justify-between py-2 border-b border-[var(--border-subtle)]">
               <span className="text-[var(--color-text-dim)]">Backend</span>
               <span className="text-[var(--color-success)] font-mono">NestJS + Prisma</span>
             </div>
+            <div className="flex justify-between py-2 border-b border-[var(--border-subtle)]">
+              <span className="text-[var(--color-text-dim)]">IA</span>
+              <span className="text-[var(--color-primary)] font-mono">Gemini 2.5 Flash</span>
+            </div>
             <div className="flex justify-between py-2">
               <span className="text-[var(--color-text-dim)]">Frontend</span>
               <span className="text-[var(--color-success)] font-mono">Next.js 14</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Info card */}
-        <div className="card p-4 border-[var(--border-subtle)] bg-[var(--color-surface-1)]/50">
-          <div className="flex items-start gap-3">
-            <div className="p-1.5 rounded-lg bg-[var(--color-info-glow)] text-[var(--color-info)] shrink-0">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="16" x2="12" y2="12" />
-                <line x1="12" y1="8" x2="12.01" y2="8" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-sm text-[var(--color-text-secondary)]">
-                <strong className="text-[var(--color-text)]">Autenticação mockada</strong> — Esta é uma versão de desenvolvimento. 
-                A autenticação real será implementada na Fase 13 do roadmap.
-              </p>
             </div>
           </div>
         </div>

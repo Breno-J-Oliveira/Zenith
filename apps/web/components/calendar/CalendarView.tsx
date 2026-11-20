@@ -1,11 +1,12 @@
 'use client';
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { apiGet, apiPatch } from '@/lib/api';
+import { addCivilDays, getCivilDate, getCivilTime, ZENITH_TIME_ZONE } from '../../../../packages/shared/src/civil-date';
 
 interface CalendarEvent {
   id: string;
@@ -27,6 +28,11 @@ const eventColors: Record<string, string> = {
   appointment: '#8b5cf6',
 };
 
+function getCalendarNow(): string {
+  const instant = new Date();
+  return `${getCivilDate(instant)}T${getCivilTime(instant)}:00`;
+}
+
 export function CalendarView({ onReorgMessage }: CalendarViewProps) {
   const calendarRef = useRef<FullCalendar>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -34,7 +40,8 @@ export function CalendarView({ onReorgMessage }: CalendarViewProps) {
   const fetchEvents = useCallback(async (start: string, end: string) => {
     try {
       const from = start.split('T')[0];
-      const to = end.split('T')[0];
+      // FullCalendar usa fim exclusivo e a API usa datas inclusivas.
+      const to = addCivilDays(end.split('T')[0], -1);
       const data = await apiGet<any[]>(`/calendar?from=${from}&to=${to}`);
       setEvents(data);
     } catch {
@@ -53,8 +60,8 @@ export function CalendarView({ onReorgMessage }: CalendarViewProps) {
                  eventId.startsWith('cal-task-') ? 'task' :
                  eventId.startsWith('cal-appt-') ? 'appointment' : 'task';
 
-    const newStart = event.start.toISOString();
-    const newEnd = event.end ? event.end.toISOString() : undefined;
+    const newStart = event.startStr;
+    const newEnd = event.endStr || undefined;
 
     try {
       const data = await apiPatch<any>('/calendar/reschedule', { eventId, type, newStart, newEnd });
@@ -66,8 +73,8 @@ export function CalendarView({ onReorgMessage }: CalendarViewProps) {
       // Refresh events
       const calendar = calendarRef.current;
       if (calendar) {
-        const view = calendar.getApi().view;
-        fetchEvents(view.activeStart.toISOString(), view.activeEnd.toISOString());
+        const api = calendar.getApi();
+        fetchEvents(api.formatIso(api.view.activeStart, true), api.formatIso(api.view.activeEnd, true));
       }
     } catch {
       info.revert();
@@ -114,6 +121,8 @@ export function CalendarView({ onReorgMessage }: CalendarViewProps) {
       <FullCalendar
         ref={calendarRef}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+        timeZone={ZENITH_TIME_ZONE}
+        now={getCalendarNow}
         initialView="timeGridWeek"
         headerToolbar={{
           left: 'prev,next today',

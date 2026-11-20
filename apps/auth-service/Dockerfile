@@ -35,6 +35,7 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 RUN mkdir -p /app/keys && chown node:node /app/keys
 
@@ -55,5 +56,5 @@ CMD ["sh", "-c", "\
     openssl genrsa -out /app/keys/private.pem 2048 && \
     openssl rsa -in /app/keys/private.pem -pubout -out /app/keys/public.pem; \
   fi && \
-  npx prisma migrate deploy && \
+  node node_modules/prisma/build/index.js migrate deploy && \
   node dist/main"]

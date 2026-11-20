@@ -24,9 +24,6 @@ export class UserSyncService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    // Se o modo dev (skip validation) está ligado e ainda existe o MOCK_USER_ID,
-    // mantemos-no como fallback para endpoints que ainda não usam AuthGuard.
-    // Os endpoints novos vão usar o user real do JWT.
     this.logger.log('UserSyncService pronto — usuários do NexusAuth serão sincronizados on-demand');
   }
 

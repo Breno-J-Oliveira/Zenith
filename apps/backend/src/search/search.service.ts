@@ -1,6 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService, MOCK_USER_ID } from '../prisma.service';
-// TODO: migrar para user.id do JWT quando auth real cobrir todos os endpoints
+import { PrismaService } from '../prisma.service';
 import { GoalsService } from '../goals/goals.service';
 import { TasksService } from '../tasks/tasks.service';
 import { RoutinesService } from '../routines/routines.service';
@@ -94,9 +93,6 @@ export class SearchService {
     types?: SearchHitType[],
     limit = 10,
   ): Promise<SearchResponse> {
-    // Por enquanto, todos os services (goals, tasks, etc) usam MOCK_USER_ID.
-    // Quando o auth real cobrir todos os endpoints, trocar para userId do JWT.
-    const effectiveUserId = MOCK_USER_ID;
     const q = norm(query);
     if (q.length < 2) {
       return { query, total: 0, byType: {} as any, results: [] };

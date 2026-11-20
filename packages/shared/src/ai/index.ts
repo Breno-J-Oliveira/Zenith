@@ -1,4 +1,5 @@
 import { AIIntent, ParsedAIResult, ExpensePayload, GoalPayload, TaskPayload, EventPayload } from '../types';
+import { civilDateAnchor, getCivilDate } from '../civil-date';
 
 const EXPENSE_KEYWORDS = ['gastei', 'gastou', 'comi', 'paguei', 'gasto', 'gasta'];
 const EVENT_KEYWORDS = ['reunião', 'reuniao', 'compromisso', 'evento', 'encontro'];
@@ -23,16 +24,20 @@ function guessCategory(text: string): string {
   return 'outros';
 }
 
-function extractDate(text: string): string | undefined {
+function extractDate(text: string, today: string): string | undefined {
   const dayMatch = text.match(/dia\s*(\d{1,2})/i);
-  if (dayMatch) {
-    const now = new Date();
-    const day = parseInt(dayMatch[1]);
-    const month = now.getMonth();
-    const year = now.getFullYear();
-    const date = new Date(year, month, day);
-    if (date < now) date.setMonth(month + 1);
-    return date.toISOString().split('T')[0];
+  if (!dayMatch) return undefined;
+
+  const day = Number(dayMatch[1]);
+  if (day < 1 || day > 31) return undefined;
+
+  const current = civilDateAnchor(today);
+  for (let offset = 0; offset <= 2; offset++) {
+    const candidate = new Date(current);
+    candidate.setUTCMonth(current.getUTCMonth() + offset, day);
+    if (candidate.getUTCDate() === day && candidate >= current) {
+      return candidate.toISOString().slice(0, 10);
+    }
   }
   return undefined;
 }
@@ -52,7 +57,8 @@ export class MockAIProvider {
     // TODO(ai-openai-integration): substituir parsing determinístico por chamada à OpenAI API (GPT-4o-mini)
     // O prompt template está documentado em ANOTAÇÕES.md seção "Prompt template"
     const lower = text.toLowerCase();
-    const now = new Date().toISOString();
+    const now = new Date();
+    const today = getCivilDate(now);
 
     if (EXPENSE_KEYWORDS.some(k => lower.includes(k))) {
       const amount = extractAmount(text);
@@ -61,25 +67,25 @@ export class MockAIProvider {
           amount,
           category: guessCategory(text),
           description: text.trim(),
-          date: now,
+          date: now.toISOString(),
         };
         return { intent: 'LOG_EXPENSE', confidence: 0.9, payload, rawText: text };
       }
     }
 
     if (EVENT_KEYWORDS.some(k => lower.includes(k))) {
-      const date = extractDate(text);
+      const date = extractDate(text, today);
       const time = extractTime(text);
       const payload: EventPayload = {
         title: text.trim(),
-        date: date || now.split('T')[0],
+        date: date || today,
         time,
       };
       return { intent: 'CREATE_EVENT', confidence: 0.85, payload, rawText: text };
     }
 
     if (GOAL_KEYWORDS.some(k => lower.includes(k))) {
-      const deadline = extractDate(text);
+      const deadline = extractDate(text, today);
       const payload: GoalPayload = {
         title: text.trim(),
         deadline,
@@ -89,7 +95,7 @@ export class MockAIProvider {
     }
 
     if (TASK_KEYWORDS.some(k => lower.includes(k))) {
-      const date = extractDate(text);
+      const date = extractDate(text, today);
       const payload: TaskPayload = {
         title: text.trim(),
         date,

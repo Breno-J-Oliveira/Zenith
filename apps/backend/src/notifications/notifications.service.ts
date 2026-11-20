@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { getCivilDayBounds } from '../../../../packages/shared/src/civil-date';
 import { PrismaService, MOCK_USER_ID } from '../prisma.service';
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error' | 'reminder';
@@ -107,7 +108,7 @@ export class NotificationsService {
     const routines = await this.prisma.routine.findMany({
       where: { userId, active: true },
     });
-    const today = new Date().toISOString().split('T')[0];
+    const { start, end } = getCivilDayBounds();
     const created: any[] = [];
     for (const r of routines) {
       // Evita duplicar: só cria se não existir notificação para essa rotina hoje
@@ -116,7 +117,7 @@ export class NotificationsService {
           userId,
           relatedType: 'routine',
           relatedId: r.id,
-          createdAt: { gte: new Date(today + 'T00:00:00.000Z') },
+          createdAt: { gte: start, lt: end },
         },
       });
       if (existing) continue;

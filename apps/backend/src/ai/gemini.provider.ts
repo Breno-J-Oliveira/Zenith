@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getCivilDate } from '../../../../packages/shared/src/civil-date';
 import { ParsedAIResult, AIIntent, ExpensePayload, GoalPayload, TaskPayload, EventPayload, RoutinePayload, AppointmentPayload } from '../../../../packages/shared/src/types';
 
 const GEMINI_MODEL = 'gemini-2.5-flash';
@@ -52,7 +53,7 @@ export class GeminiProvider {
   private model: string;
 
   constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.ZENITH_TEST_BACKEND === 'true' ? undefined : process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY não configurada. Crie apps/backend/.env com GEMINI_API_KEY=sua_key');
     }
@@ -64,7 +65,7 @@ export class GeminiProvider {
     const model = this.genAI.getGenerativeModel({ model: this.model });
 
     const result = await model.generateContent([
-      { text: SYSTEM_PROMPT },
+      { text: `${SYSTEM_PROMPT}\nData atual no Zenith: ${getCivilDate()}.` },
       { text: `Input: "${text}"\nOutput:` },
     ]);
 
@@ -116,7 +117,7 @@ export class GeminiProvider {
       case 'CREATE_EVENT':
         return {
           title: String(payload.title || ''),
-          date: String(payload.date || new Date().toISOString().split('T')[0]),
+          date: String(payload.date || getCivilDate()),
           time: payload.time ? String(payload.time) : undefined,
         } as EventPayload;
       case 'CREATE_GOAL':
@@ -140,7 +141,7 @@ export class GeminiProvider {
       case 'CREATE_APPOINTMENT':
         return {
           title: String(payload.title || ''),
-          date: String(payload.date || new Date().toISOString().split('T')[0]),
+          date: String(payload.date || getCivilDate()),
           startTime: String(payload.startTime || '00:00'),
           endTime: String(payload.endTime || '01:00'),
         } as AppointmentPayload;

@@ -17,11 +17,15 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { AuthModule } from './auth/auth.module';
 import { SearchModule } from './search/search.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { ExportModule } from './export/export.module';
 import { NexusAuthGuard } from './auth/auth.guard';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      ignoreEnvFile: process.env.ZENITH_TEST_BACKEND === 'true',
+    }),
     PrismaModule,
     AuthModule,
     AIModule,
@@ -36,6 +40,7 @@ import { NexusAuthGuard } from './auth/auth.guard';
     NotificationsModule,
     SearchModule,
     UploadsModule,
+    ExportModule,
   ],
   controllers: [AppController],
   providers: [

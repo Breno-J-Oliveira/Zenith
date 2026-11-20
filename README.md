@@ -18,7 +18,7 @@
 
 ## O que é o Zenith?
 
-O **Zenith** é uma aplicação fullstack de **organização pessoal com IA**, disponível em três plataformas (web, desktop e mobile). Inspirado no Notion, o Zenith permite ao usuário montar qualquer estrutura de organização — tabelas, galerias, listas, páginas — com um diferencial: a **IA como orquestradora central**, capaz de raciocinar, criar, editar e reorganizar qualquer parte do sistema por conta própria.
+O **Zenith** é uma aplicação web fullstack de **organização pessoal**. Inspirado no Notion, oferece tarefas, rotinas, calendário, páginas e bases personalizáveis. A IA é um recurso de apoio. O cliente desktop com Tauri está em desenvolvimento e o cliente mobile nativo está no roadmap.
 
 **Praticidade acima de tudo:** pegar o celular, anotar na hora e pronto. A IA organiza a maior parte.
 
@@ -43,7 +43,7 @@ Projeto desenvolvido como **portfolio pessoal** (solo), demonstrando domínio de
 ### Para o desenvolvedor
 - **Monorepo Turborepo** com 3 apps + 1 package compartilhado
 - **Autenticação real** com NexusAuth (JWT RS256 + JWKS)
-- **Prisma ORM** com SQLite (dev) e PostgreSQL (produção)
+- **Prisma ORM** com SQLite no Zenith. O NexusAuth usa PostgreSQL e Redis.
 - **IA via Google Gemini** com fallback para mock determinístico
 - **SchedulerService + ConflictResolver** para reorganização automática de agenda
 - **Middleware de proteção de rotas** com Next.js Edge
@@ -83,7 +83,7 @@ Projeto desenvolvido como **portfolio pessoal** (solo), demonstrando domínio de
 |--------|-----------|
 | Frontend | Next.js 14 (App Router), React 18, Tailwind CSS, Framer Motion |
 | Backend | NestJS 10, TypeScript 5 |
-| ORM | Prisma 6 (SQLite dev / PostgreSQL prod) |
+| ORM | Prisma 6 (Zenith em SQLite, NexusAuth em PostgreSQL) |
 | Autenticação | NexusAuth (JWT RS256, JWKS, OAuth2, 2FA) |
 | IA | Google Gemini 2.5 Flash + Mock Provider |
 | Calendário | FullCalendar |
@@ -93,6 +93,11 @@ Projeto desenvolvido como **portfolio pessoal** (solo), demonstrando domínio de
 ---
 
 ## Como Rodar
+
+Para verificar o login e o isolamento em uma base fictícia, siga o
+[roteiro de estabilização M1](docs/M1-AMBIENTE-LOCAL.md). Para a direção do
+produto e a fila de entregas, consulte o [plano](docs/PLANO-DE-PRODUTO-ZENITH.md)
+e o [backlog](docs/BACKLOG-ZENITH.md).
 
 ### Pré-requisitos
 - Node.js 20+
@@ -112,7 +117,7 @@ cd Zenith
 npm install
 ```
 
-### 3. Gere as chaves RSA (para o NexusAuth)
+### 3. Gere as chaves RSA para o NexusAuth
 
 ```bash
 mkdir -p apps/auth-service/keys
@@ -139,9 +144,8 @@ Edite os `.env` com suas chaves (GEMINI_API_KEY, ENCRYPTION_KEY, etc).
 
 ```bash
 cd apps/auth-service
-docker compose up -d
+    docker compose up -d api
 cd ../..
-docker exec nexus-api npx prisma migrate deploy
 ```
 
 ### 6. Gere o Prisma Client do backend

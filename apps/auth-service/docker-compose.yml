@@ -47,7 +47,7 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
-    env_file: .env
+    env_file: ${NEXUS_AUTH_ENV_FILE:-.env}
     environment:
       # M4 fix: override REDIS_URL to include password (matches redis service requirepass)
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set}@redis:6379

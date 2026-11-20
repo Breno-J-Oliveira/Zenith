@@ -1,5 +1,7 @@
 'use client';
 
+// Necessário para export estático — useSearchParams precisa de Suspense boundary
+import { Suspense } from 'react';
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { saveTokens } from '@zenith/shared';
@@ -8,7 +10,7 @@ import { saveTokens } from '@zenith/shared';
  * /auth/callback — Recebe tokens do OAuth (Google/GitHub) via query params
  * após o redirecionamento do NexusAuth. Salva os tokens e redireciona para /dashboard.
  */
-export default function OAuthCallbackPage() {
+function OAuthCallbackPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -38,5 +40,13 @@ export default function OAuthCallbackPage() {
         <p className="text-[var(--color-text-dim)] text-sm">Processando login...</p>
       </div>
     </div>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"><p className="text-[var(--color-text-dim)]">Carregando...</p></div>}>
+      <OAuthCallbackPageContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { GoogleGenerativeAI, Tool } from '@google/generative-ai';
-import { PrismaService, MOCK_USER_ID } from '../prisma.service';
+import { getCivilDate } from '../../../../packages/shared/src/civil-date';
+import { PrismaService } from '../prisma.service';
 import { GoalsService } from '../goals/goals.service';
 import { TasksService } from '../tasks/tasks.service';
 import { RoutinesService } from '../routines/routines.service';
@@ -54,7 +55,7 @@ export class AgentService {
     private readonly schedulerService: SchedulerService,
     private readonly databasesService: DatabasesService,
   ) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.ZENITH_TEST_BACKEND === 'true' ? undefined : process.env.GEMINI_API_KEY;
     if (apiKey) {
       this.genAI = new GoogleGenerativeAI(apiKey);
     } else {
@@ -355,6 +356,7 @@ export class AgentService {
    * Retorna a resposta final em linguagem natural + as tools chamadas (para auditoria).
    */
   async process(
+    userId: string,
     userMessage: string,
     history: Array<{ role: 'user' | 'model'; parts: { text: string }[] }> = [],
   ): Promise<{ text: string; toolCalls: Array<{ name: string; args: any; result: any }>; source: 'gemini' | 'fallback' }> {
@@ -372,7 +374,7 @@ export class AgentService {
     let lastErr: any = null;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        return await this.attemptProcess(userMessage, history);
+        return await this.attemptProcess(userId, userMessage, history);
       } catch (err: any) {
         lastErr = err;
         const isOverload = err.message?.includes('503') || err.message?.includes('high demand') || err.message?.includes('overloaded');
@@ -386,13 +388,14 @@ export class AgentService {
   }
 
   private async attemptProcess(
+    userId: string,
     userMessage: string,
     history: Array<{ role: 'user' | 'model'; parts: { text: string }[] }> = [],
   ): Promise<{ text: string; toolCalls: Array<{ name: string; args: any; result: any }>; source: 'gemini' | 'fallback' }> {
     const model = this.genAI.getGenerativeModel({
       model: GEMINI_MODEL,
       tools: this.tools,
-      systemInstruction: SYSTEM_INSTRUCTION,
+      systemInstruction: `${SYSTEM_INSTRUCTION}\nData atual no Zenith: ${getCivilDate()}.`,
     });
 
     const chat = model.startChat({ history });
@@ -408,10 +411,10 @@ export class AgentService {
       const functionResponses: any[] = [];
 
       for (const call of calls) {
-        this.logger.log(`Tool call: ${call.name}(${JSON.stringify(call.args)})`);
+        this.logger.log(`Tool call: ${call.name}`);
         let toolResult: any;
         try {
-          toolResult = await this.executeTool(call.name, call.args || {});
+          toolResult = await this.executeTool(userId, call.name, call.args || {});
         } catch (err: any) {
           this.logger.error(`Tool ${call.name} falhou: ${err.message}`);
           toolResult = { error: err.message };
@@ -437,7 +440,7 @@ export class AgentService {
     try {
       await this.prisma.aILog.create({
         data: {
-          userId: MOCK_USER_ID,
+          userId,
           input: userMessage,
           result: JSON.stringify({ toolCalls, text: finalText }),
         },
@@ -452,8 +455,7 @@ export class AgentService {
   /**
    * Executa uma tool. Retorna um objeto simples (sem PII) para enviar de volta ao Gemini.
    */
-  private async executeTool(name: string, args: any): Promise<any> {
-    const userId = MOCK_USER_ID; // TODO: migrar para @CurrentUser quando backend estiver autenticado em todas as rotas
+  private async executeTool(userId: string, name: string, args: any): Promise<any> {
     switch (name) {
       // ─── LEITURA ─────────────────────────────────────────────
       case 'list_goals': {
@@ -524,7 +526,7 @@ export class AgentService {
         };
       }
       case 'get_today_summary': {
-        const today = new Date().toISOString().split('T')[0];
+        const today = getCivilDate();
         const tasks = await this.tasksService.findAll(userId);
         const todayTasks = tasks.filter((t) => t.date === today);
         const routines = await this.routinesService.findAll(userId, { active: true });
@@ -633,7 +635,7 @@ export class AgentService {
       }
       case 'log_expense': {
         // Cria preset Finanças automaticamente se não existir
-        const today = new Date().toISOString().split('T')[0];
+        const today = getCivilDate();
         const values = {
           'Descrição': args.description,
           'Valor': args.amount,
