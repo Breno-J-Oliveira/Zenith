@@ -76,6 +76,12 @@ Se uma verificação falhar, confira `http://localhost:3100/health` no NexusAuth
 
 Para parar, encerre web e API com Ctrl+C e rode `docker compose @composeArgs stop` no terminal do NexusAuth. O SQLite de teste permanece na pasta Prisma. O arquivo `dev.db` do checkout fica fora do roteiro.
 
+### Saúde e prontidão
+
+- `GET /health` indica que o processo do Zenith responde.
+- `GET /ready` verifica uma leitura na tabela de usuários e consulta a saúde do NexusAuth. Responde HTTP 200 quando ambos estão disponíveis e HTTP 503 com os estados das dependências quando uma verificação falha. O smoke confere o caminho saudável.
+- `GET /auth/health` permite diagnosticar o NexusAuth separadamente.
+
 ## Estado da validação em 20/11/2026
 
 Para repetir o smoke sem consumir a cota de cadastros, reutilize duas contas fictícias distintas do ambiente atual:

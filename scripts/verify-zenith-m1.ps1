@@ -69,6 +69,10 @@ function Get-FixtureToken {
 $null = Invoke-FixtureRequest "$authUrl/health"
 $null = Invoke-FixtureRequest "$apiUrl/health"
 $null = Invoke-FixtureRequest "$apiUrl/auth/health"
+$ready = Invoke-FixtureRequest "$apiUrl/ready"
+if ($ready.status -ne 'ok' -or $ready.checks.database -ne 'ok' -or $ready.checks.auth -ne 'ok') {
+    throw 'O Zenith deve confirmar prontidão do banco e da autenticação.'
+}
 $null = Invoke-FixtureRequest "$apiUrl/calendar" -ExpectedStatus 401
 $null = Invoke-FixtureRequest "$apiUrl/ai/briefing" -ExpectedStatus 401
 $loginPage = Invoke-WebRequest "$webUrl/hoje/" -MaximumRedirection 2 -TimeoutSec 60
