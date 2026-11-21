@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GoogleGenerativeAI, Tool } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType, Tool } from '@google/generative-ai';
 import { getCivilDate } from '../../../../packages/shared/src/civil-date';
 import { PrismaService } from '../prisma.service';
 import { GoalsService } from '../goals/goals.service';
@@ -76,15 +76,17 @@ export class AgentService {
             name: 'list_goals',
             description: 'Lista as metas do usuário. Pode filtrar por status (ACTIVE, COMPLETED, ARCHIVED) e categoria.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
                 status: {
-                  type: 'string',
+                  type: SchemaType.STRING,
+                  format: 'enum',
                   enum: ['ACTIVE', 'COMPLETED', 'ARCHIVED'],
                   description: 'Filtrar por status da meta',
                 },
                 category: {
-                  type: 'string',
+                  type: SchemaType.STRING,
+                  format: 'enum',
                   enum: ['pessoal', 'trabalho', 'financeiro', 'saude', 'estudo'],
                   description: 'Filtrar por categoria',
                 },
@@ -95,11 +97,11 @@ export class AgentService {
             name: 'list_tasks',
             description: 'Lista tarefas do usuário. Pode filtrar por status (ACTIVE/COMPLETED), goalId ou data (YYYY-MM-DD).',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                status: { type: 'string', enum: ['ACTIVE', 'COMPLETED'] },
-                goalId: { type: 'string', description: 'ID da meta para listar apenas suas tarefas' },
-                date: { type: 'string', description: 'Data no formato YYYY-MM-DD' },
+                status: { type: SchemaType.STRING, format: 'enum', enum: ['ACTIVE', 'COMPLETED'] },
+                goalId: { type: SchemaType.STRING, description: 'ID da meta para listar apenas suas tarefas' },
+                date: { type: SchemaType.STRING, description: 'Data no formato YYYY-MM-DD' },
               },
             },
           },
@@ -107,9 +109,9 @@ export class AgentService {
             name: 'list_routines',
             description: 'Lista as rotinas do usuário. Pode filtrar por ativas/inativas.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                activeOnly: { type: 'boolean', description: 'Se true, retorna apenas rotinas ativas' },
+                activeOnly: { type: SchemaType.BOOLEAN, description: 'Se true, retorna apenas rotinas ativas' },
               },
             },
           },
@@ -117,24 +119,24 @@ export class AgentService {
             name: 'list_appointments',
             description: 'Lista os compromissos do usuário. Pode filtrar por data (YYYY-MM-DD).',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                date: { type: 'string', description: 'Data no formato YYYY-MM-DD' },
+                date: { type: SchemaType.STRING, description: 'Data no formato YYYY-MM-DD' },
               },
             },
           },
           {
             name: 'get_today_summary',
             description: 'Retorna um resumo do dia atual: tarefas pendentes, rotinas de hoje, compromissos, metas em andamento.',
-            parameters: { type: 'object', properties: {} },
+            parameters: { type: SchemaType.OBJECT, properties: {} },
           },
           {
             name: 'search',
             description: 'Busca por termo em metas, tarefas, rotinas, compromissos e databases do usuário.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                query: { type: 'string', description: 'Termo de busca' },
+                query: { type: SchemaType.STRING, description: 'Termo de busca' },
               },
               required: ['query'],
             },
@@ -145,13 +147,13 @@ export class AgentService {
             name: 'create_goal',
             description: 'Cria uma nova meta para o usuário.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                title: { type: 'string', description: 'Título da meta' },
-                description: { type: 'string' },
-                category: { type: 'string', enum: ['pessoal', 'trabalho', 'financeiro', 'saude', 'estudo'] },
-                priority: { type: 'string', enum: ['baixa', 'media', 'alta'] },
-                deadline: { type: 'string', description: 'Prazo no formato YYYY-MM-DD' },
+                title: { type: SchemaType.STRING, description: 'Título da meta' },
+                description: { type: SchemaType.STRING },
+                category: { type: SchemaType.STRING, format: 'enum', enum: ['pessoal', 'trabalho', 'financeiro', 'saude', 'estudo'] },
+                priority: { type: SchemaType.STRING, format: 'enum', enum: ['baixa', 'media', 'alta'] },
+                deadline: { type: SchemaType.STRING, description: 'Prazo no formato YYYY-MM-DD' },
               },
               required: ['title'],
             },
@@ -160,12 +162,12 @@ export class AgentService {
             name: 'create_task',
             description: 'Cria uma nova tarefa (pontual, não-recorrente).',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                title: { type: 'string' },
-                description: { type: 'string' },
-                date: { type: 'string', description: 'Data alvo no formato YYYY-MM-DD' },
-                goalId: { type: 'string', description: 'Vincular à meta existente (opcional)' },
+                title: { type: SchemaType.STRING },
+                description: { type: SchemaType.STRING },
+                date: { type: SchemaType.STRING, description: 'Data alvo no formato YYYY-MM-DD' },
+                goalId: { type: SchemaType.STRING, description: 'Vincular à meta existente (opcional)' },
               },
               required: ['title'],
             },
@@ -174,12 +176,12 @@ export class AgentService {
             name: 'create_routine',
             description: 'Cria uma rotina recorrente (diária/semanal/mensal).',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                title: { type: 'string' },
-                frequency: { type: 'string', enum: ['daily', 'weekly', 'monthly'] },
-                time: { type: 'string', description: 'Horário no formato HH:MM' },
-                duration: { type: 'number', description: 'Duração em minutos' },
+                title: { type: SchemaType.STRING },
+                frequency: { type: SchemaType.STRING, format: 'enum', enum: ['daily', 'weekly', 'monthly'] },
+                time: { type: SchemaType.STRING, description: 'Horário no formato HH:MM' },
+                duration: { type: SchemaType.NUMBER, description: 'Duração em minutos' },
               },
               required: ['title', 'time'],
             },
@@ -188,12 +190,12 @@ export class AgentService {
             name: 'create_appointment',
             description: 'Cria um compromisso pontual e reorganiza rotinas conflitantes.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                title: { type: 'string' },
-                date: { type: 'string', description: 'Data no formato YYYY-MM-DD' },
-                startTime: { type: 'string', description: 'Início no formato HH:MM' },
-                endTime: { type: 'string', description: 'Fim no formato HH:MM' },
+                title: { type: SchemaType.STRING },
+                date: { type: SchemaType.STRING, description: 'Data no formato YYYY-MM-DD' },
+                startTime: { type: SchemaType.STRING, description: 'Início no formato HH:MM' },
+                endTime: { type: SchemaType.STRING, description: 'Fim no formato HH:MM' },
               },
               required: ['title', 'date', 'startTime', 'endTime'],
             },
@@ -202,19 +204,19 @@ export class AgentService {
             name: 'create_database',
             description: 'Cria um novo database vazio com propriedades customizadas. Para começar de um preset pronto (Finanças, Lista de Compras, etc.), use create_database_from_preset.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                title: { type: 'string' },
-                icon: { type: 'string' },
+                title: { type: SchemaType.STRING },
+                icon: { type: SchemaType.STRING },
                 properties: {
-                  type: 'array',
+                  type: SchemaType.ARRAY,
                   description: 'Lista de propriedades do database',
                   items: {
-                    type: 'object',
+                    type: SchemaType.OBJECT,
                     properties: {
-                      name: { type: 'string' },
-                      type: { type: 'string', enum: ['text', 'number', 'currency', 'date', 'checkbox', 'select', 'multi_select'] },
-                      options: { type: 'array', items: { type: 'string' } },
+                      name: { type: SchemaType.STRING },
+                      type: { type: SchemaType.STRING, format: 'enum', enum: ['text', 'number', 'currency', 'date', 'checkbox', 'select', 'multi_select'] },
+                      options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
                     },
                     required: ['name', 'type'],
                   },
@@ -227,10 +229,11 @@ export class AgentService {
             name: 'create_database_from_preset',
             description: 'Cria um database pronto a partir de um preset. Presets disponíveis: finance (Finanças), shopping (Lista de Compras), study (Estudos), habits (Hábitos).',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
                 presetType: {
-                  type: 'string',
+                  type: SchemaType.STRING,
+                  format: 'enum',
                   enum: ['finance', 'shopping', 'study', 'habits'],
                   description: 'Tipo do preset',
                 },
@@ -242,12 +245,13 @@ export class AgentService {
             name: 'add_to_database',
             description: 'Adiciona uma linha/registro a um database existente. Use databaseTitle (mais amigável) ou databaseId. Os valores são passados como { nomeDaColuna: valor } — a IA não precisa saber o ID da coluna.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                databaseTitle: { type: 'string', description: 'Título do database (ex: "Finanças", "Lista de Compras")' },
-                databaseId: { type: 'string', description: 'ID do database (alternativa ao título)' },
+                databaseTitle: { type: SchemaType.STRING, description: 'Título do database (ex: "Finanças", "Lista de Compras")' },
+                databaseId: { type: SchemaType.STRING, description: 'ID do database (alternativa ao título)' },
                 values: {
-                  type: 'object',
+                  type: SchemaType.OBJECT,
+                  properties: {},
                   description: 'Objeto { coluna: valor } — a IA deve usar o NOME da coluna, não o ID',
                 },
               },
@@ -258,12 +262,12 @@ export class AgentService {
             name: 'log_expense',
             description: 'Atalho para registrar um gasto no preset Finanças. Cria o preset automaticamente se não existir. Use para: "gastei X em Y", "comprei X por Y", "paguei X de Y".',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                description: { type: 'string', description: 'Descrição do gasto (ex: "pastel", "uber", "almoço")' },
-                amount: { type: 'number', description: 'Valor em reais (ex: 25.50)' },
-                category: { type: 'string', description: 'Categoria: Alimentação, Transporte, Lazer, Saúde, Educação, Moradia, Outros' },
-                date: { type: 'string', description: 'Data do gasto (YYYY-MM-DD), opcional — default hoje' },
+                description: { type: SchemaType.STRING, description: 'Descrição do gasto (ex: "pastel", "uber", "almoço")' },
+                amount: { type: SchemaType.NUMBER, description: 'Valor em reais (ex: 25.50)' },
+                category: { type: SchemaType.STRING, description: 'Categoria: Alimentação, Transporte, Lazer, Saúde, Educação, Moradia, Outros' },
+                date: { type: SchemaType.STRING, description: 'Data do gasto (YYYY-MM-DD), opcional — default hoje' },
               },
               required: ['description', 'amount'],
             },
@@ -272,9 +276,9 @@ export class AgentService {
             name: 'list_databases',
             description: 'Lista todos os databases do usuário (exceto os que não são presets). Útil para descobrir quais databases existem antes de consultar.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                onlyPresets: { type: 'boolean', description: 'Se true, retorna apenas os databases que vieram de presets' },
+                onlyPresets: { type: SchemaType.BOOLEAN, description: 'Se true, retorna apenas os databases que vieram de presets' },
               },
             },
           },
@@ -282,10 +286,10 @@ export class AgentService {
             name: 'get_database_schema',
             description: 'Retorna o schema (nome, tipo, opções) das colunas de um database específico. Use ANTES de query_database para entender quais colunas e valores são válidos.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                databaseTitle: { type: 'string' },
-                databaseId: { type: 'string' },
+                databaseTitle: { type: SchemaType.STRING },
+                databaseId: { type: SchemaType.STRING },
               },
             },
           },
@@ -293,11 +297,11 @@ export class AgentService {
             name: 'get_database_rows',
             description: 'Lista as linhas (registros) de um database. Use para responder perguntas como "quais gastos eu tive essa semana", "o que tem na minha lista de compras".',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                databaseTitle: { type: 'string' },
-                databaseId: { type: 'string' },
-                limit: { type: 'number', description: 'Limite de linhas a retornar (default 50)' },
+                databaseTitle: { type: SchemaType.STRING },
+                databaseId: { type: SchemaType.STRING },
+                limit: { type: SchemaType.NUMBER, description: 'Limite de linhas a retornar (default 50)' },
               },
             },
           },
@@ -305,17 +309,17 @@ export class AgentService {
             name: 'query_database',
             description: 'Consulta um database com filtro por categoria e/ou período. Útil para perguntas como "quanto gastei com Alimentação esta semana".',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                databaseTitle: { type: 'string' },
-                databaseId: { type: 'string' },
-                categoryColumn: { type: 'string', description: 'Nome da coluna de categoria (ex: "Categoria")' },
-                categoryValue: { type: 'string', description: 'Valor da categoria (ex: "Alimentação")' },
-                dateColumn: { type: 'string', description: 'Nome da coluna de data' },
-                dateFrom: { type: 'string', description: 'Data inicial (YYYY-MM-DD)' },
-                dateTo: { type: 'string', description: 'Data final (YYYY-MM-DD)' },
-                aggregate: { type: 'string', enum: ['sum', 'count', 'list', 'average'], description: 'Tipo de agregação: sum (somar coluna numérica), count (contar linhas), list (listar valores), average (média)' },
-                aggregateColumn: { type: 'string', description: 'Coluna numérica para somar / agregar' },
+                databaseTitle: { type: SchemaType.STRING },
+                databaseId: { type: SchemaType.STRING },
+                categoryColumn: { type: SchemaType.STRING, description: 'Nome da coluna de categoria (ex: "Categoria")' },
+                categoryValue: { type: SchemaType.STRING, description: 'Valor da categoria (ex: "Alimentação")' },
+                dateColumn: { type: SchemaType.STRING, description: 'Nome da coluna de data' },
+                dateFrom: { type: SchemaType.STRING, description: 'Data inicial (YYYY-MM-DD)' },
+                dateTo: { type: SchemaType.STRING, description: 'Data final (YYYY-MM-DD)' },
+                aggregate: { type: SchemaType.STRING, format: 'enum', enum: ['sum', 'count', 'list', 'average'], description: 'Tipo de agregação: sum (somar coluna numérica), count (contar linhas), list (listar valores), average (média)' },
+                aggregateColumn: { type: SchemaType.STRING, description: 'Coluna numérica para somar / agregar' },
               },
             },
           },
@@ -325,9 +329,9 @@ export class AgentService {
             name: 'complete_task',
             description: 'Marca uma tarefa como concluída.',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                taskId: { type: 'string' },
+                taskId: { type: SchemaType.STRING },
               },
               required: ['taskId'],
             },
@@ -336,12 +340,12 @@ export class AgentService {
             name: 'update_routine_time',
             description: 'Atualiza o horário de uma rotina existente (usado para reagendar quando há conflito).',
             parameters: {
-              type: 'object',
+              type: SchemaType.OBJECT,
               properties: {
-                routineId: { type: 'string' },
-                newTime: { type: 'string', description: 'Novo horário no formato HH:MM' },
-                newDate: { type: 'string', description: 'Nova data se for tarefa gerada (YYYY-MM-DD)' },
-                taskId: { type: 'string', description: 'ID da tarefa gerada a mover (opcional)' },
+                routineId: { type: SchemaType.STRING },
+                newTime: { type: SchemaType.STRING, description: 'Novo horário no formato HH:MM' },
+                newDate: { type: SchemaType.STRING, description: 'Nova data se for tarefa gerada (YYYY-MM-DD)' },
+                taskId: { type: SchemaType.STRING, description: 'ID da tarefa gerada a mover (opcional)' },
               },
               required: ['routineId'],
             },
