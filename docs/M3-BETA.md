@@ -46,6 +46,30 @@ com o NexusAuth e o piloto continuam com verificações próprias.
   o schema atual. Se houver dano nos dados, preserve o estado para diagnóstico
   e ensaie o retorno a um backup isolado antes de trocar a base em uso.
 
+## Evidência local
+
+- A checagem de CORS passou via HTTP. A origem permitida recebeu o cabeçalho
+  de autorização no preflight. A origem externa ficou sem o cabeçalho.
+  A API respondeu HTTP 200 em `/ready`.
+- O ensaio restaurou o dump do PostgreSQL em uma base vazia e confirmou
+  com Prisma que as quatro migrações do auth estavam aplicadas. O SQLite
+  restaurado passou nas checagens de integridade e preservou sete tarefas
+  fictícias. O upload recuperado manteve o SHA-256 e ficou inacessível para
+  outra conta. O NexusAuth restaurado ficou indisponível na verificação de
+  saúde em duas tentativas. Repetir a recuperação com login novo, dados e
+  smoke no ambiente selecionado antes de convidar pessoas.
+- A instalação de teste no Linux retornou avisos de segurança para a
+  árvore completa de dependências, incluindo quatro críticos. A auditoria
+  de produção e a correção dos avisos aplicáveis são parte do aceite da beta.
+
+## Primeira sessão da beta
+
+Oriente cada participante a capturar uma tarefa fictícia, encontrá-la na Caixa
+de Entrada, trazê-la para Hoje, concluir e consultar a revisão. Peça que volte
+no dispositivo habitual para planejar um dia real. Registre bloqueios,
+alternativas usadas e dúvidas espontâneas. A contagem de retorno usa uma ação
+na segunda semana, conforme o plano de produto.
+
 ## Evidência da coorte
 
 Registrar, sem conteúdo das tarefas, o número de pessoas convidadas, ativadas

@@ -80,11 +80,13 @@ export class AgentService {
               properties: {
                 status: {
                   type: SchemaType.STRING,
+                  format: 'enum',
                   enum: ['ACTIVE', 'COMPLETED', 'ARCHIVED'],
                   description: 'Filtrar por status da meta',
                 },
                 category: {
                   type: SchemaType.STRING,
+                  format: 'enum',
                   enum: ['pessoal', 'trabalho', 'financeiro', 'saude', 'estudo'],
                   description: 'Filtrar por categoria',
                 },
@@ -97,7 +99,7 @@ export class AgentService {
             parameters: {
               type: SchemaType.OBJECT,
               properties: {
-                status: { type: SchemaType.STRING, enum: ['ACTIVE', 'COMPLETED'] },
+                status: { type: SchemaType.STRING, format: 'enum', enum: ['ACTIVE', 'COMPLETED'] },
                 goalId: { type: SchemaType.STRING, description: 'ID da meta para listar apenas suas tarefas' },
                 date: { type: SchemaType.STRING, description: 'Data no formato YYYY-MM-DD' },
               },
@@ -149,8 +151,8 @@ export class AgentService {
               properties: {
                 title: { type: SchemaType.STRING, description: 'Título da meta' },
                 description: { type: SchemaType.STRING },
-                category: { type: SchemaType.STRING, enum: ['pessoal', 'trabalho', 'financeiro', 'saude', 'estudo'] },
-                priority: { type: SchemaType.STRING, enum: ['baixa', 'media', 'alta'] },
+                category: { type: SchemaType.STRING, format: 'enum', enum: ['pessoal', 'trabalho', 'financeiro', 'saude', 'estudo'] },
+                priority: { type: SchemaType.STRING, format: 'enum', enum: ['baixa', 'media', 'alta'] },
                 deadline: { type: SchemaType.STRING, description: 'Prazo no formato YYYY-MM-DD' },
               },
               required: ['title'],
@@ -177,7 +179,7 @@ export class AgentService {
               type: SchemaType.OBJECT,
               properties: {
                 title: { type: SchemaType.STRING },
-                frequency: { type: SchemaType.STRING, enum: ['daily', 'weekly', 'monthly'] },
+                frequency: { type: SchemaType.STRING, format: 'enum', enum: ['daily', 'weekly', 'monthly'] },
                 time: { type: SchemaType.STRING, description: 'Horário no formato HH:MM' },
                 duration: { type: SchemaType.NUMBER, description: 'Duração em minutos' },
               },
@@ -213,7 +215,7 @@ export class AgentService {
                     type: SchemaType.OBJECT,
                     properties: {
                       name: { type: SchemaType.STRING },
-                      type: { type: SchemaType.STRING, enum: ['text', 'number', 'currency', 'date', 'checkbox', 'select', 'multi_select'] },
+                      type: { type: SchemaType.STRING, format: 'enum', enum: ['text', 'number', 'currency', 'date', 'checkbox', 'select', 'multi_select'] },
                       options: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
                     },
                     required: ['name', 'type'],
@@ -231,6 +233,7 @@ export class AgentService {
               properties: {
                 presetType: {
                   type: SchemaType.STRING,
+                  format: 'enum',
                   enum: ['finance', 'shopping', 'study', 'habits'],
                   description: 'Tipo do preset',
                 },
@@ -248,6 +251,7 @@ export class AgentService {
                 databaseId: { type: SchemaType.STRING, description: 'ID do database (alternativa ao título)' },
                 values: {
                   type: SchemaType.OBJECT,
+                  properties: {},
                   description: 'Objeto { coluna: valor } — a IA deve usar o NOME da coluna, não o ID',
                 },
               },
@@ -314,7 +318,7 @@ export class AgentService {
                 dateColumn: { type: SchemaType.STRING, description: 'Nome da coluna de data' },
                 dateFrom: { type: SchemaType.STRING, description: 'Data inicial (YYYY-MM-DD)' },
                 dateTo: { type: SchemaType.STRING, description: 'Data final (YYYY-MM-DD)' },
-                aggregate: { type: SchemaType.STRING, enum: ['sum', 'count', 'list', 'average'], description: 'Tipo de agregação: sum (somar coluna numérica), count (contar linhas), list (listar valores), average (média)' },
+                aggregate: { type: SchemaType.STRING, format: 'enum', enum: ['sum', 'count', 'list', 'average'], description: 'Tipo de agregação: sum (somar coluna numérica), count (contar linhas), list (listar valores), average (média)' },
                 aggregateColumn: { type: SchemaType.STRING, description: 'Coluna numérica para somar / agregar' },
               },
             },
