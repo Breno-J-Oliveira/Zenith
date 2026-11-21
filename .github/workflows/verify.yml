@@ -41,7 +41,7 @@ jobs:
         shell: bash
         working-directory: apps/backend
         run: |
-          test_dir=node_modules/.cache/zenith-tests
+          test_dir=dist/zenith-tests
           node ../../node_modules/typescript/bin/tsc -p tsconfig.json --incremental false --outDir "$test_dir"
           mapfile -d '' -t specs < <(find "$test_dir/apps/backend/src" -name '*.spec.js' -print0)
           test "${#specs[@]}" -gt 0

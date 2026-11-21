@@ -51,16 +51,21 @@ com o NexusAuth e o piloto continuam com verificações próprias.
 - A checagem de CORS passou via HTTP. A origem permitida recebeu o cabeçalho
   de autorização no preflight. A origem externa ficou sem o cabeçalho.
   A API respondeu HTTP 200 em `/ready`.
-- O ensaio restaurou o dump do PostgreSQL em uma base vazia e confirmou
-  com Prisma que as quatro migrações do auth estavam aplicadas. O SQLite
-  restaurado passou nas checagens de integridade e preservou sete tarefas
-  fictícias. O upload recuperado manteve o SHA-256 e ficou inacessível para
-  outra conta. O NexusAuth restaurado ficou indisponível na verificação de
-  saúde em duas tentativas. Repetir a recuperação com login novo, dados e
-  smoke no ambiente selecionado antes de convidar pessoas.
-- A instalação de teste no Linux retornou avisos de segurança para a
-  árvore completa de dependências, incluindo quatro críticos. A auditoria
-  de produção e a correção dos avisos aplicáveis são parte do aceite da beta.
+- Em ambiente descartável, o PostgreSQL foi restaurado com pg_restore e o
+  Prisma confirmou as quatro migrações. O SQLite manteve as tarefas e passou
+  nas checagens de integridade. O upload recuperado manteve o SHA-256, com
+  acesso restrito à conta proprietária.
+- O NexusAuth demorou a ficar pronto nas duas primeiras tentativas. Após
+  verificar as migrações e inicializar a aplicação diretamente com novas
+  chaves de teste, duas contas fizeram login e a API preservou identidades,
+  tarefas e isolamento. O backup levou cerca de 120 s e a recuperação
+  bem-sucedida, 118 s. Repita a recuperação no staging antes dos convites.
+- A auditoria com `npm audit --omit=dev` identificou 70 entradas na árvore
+  de produção (39 moderadas, 28 altas e 3 críticas). As críticas afetam
+  Next.js, `proxy-addr` e `tar`. O npm indicou atualização de versão
+  principal do Next.js. Revise a compatibilidade com React e com o router,
+  reexecute o fluxo autenticado e a auditoria após atualizar. Avalie os
+  transitivos pela dependência que os inclui antes de convidar pessoas.
 
 ## Primeira sessão da beta
 
