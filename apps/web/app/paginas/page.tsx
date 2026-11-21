@@ -3,8 +3,8 @@
 // Necessário para export estático — useSearchParams precisa de Suspense boundary
 import { FileText } from 'lucide-react';
 import { Suspense } from 'react';
-import { useState, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import Link from 'next/link';
 import { apiGet, apiPost } from '@/lib/api';
@@ -21,16 +21,35 @@ interface PageItem {
 }
 
 function PaginasPageContent() {
-  const searchParams = useSearchParams();
+  const router = useRouter();
+  const createFromShortcut = useSearchParams().get('new') === 'true';
   const [pages, setPages] = useState<PageItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const creatingPage = useRef(false);
 
-  // Suporta ?new=true vindo do Command Palette
-  useEffect(() => {
-    if (searchParams.get('new') === 'true') {
-      createPage();
+  const createPage = useCallback(async () => {
+    if (creatingPage.current) return;
+    creatingPage.current = true;
+    setCreating(true);
+    setCreateError('');
+
+    try {
+      const page = await apiPost<PageItem>('/pages', { title: 'Nova Página' });
+      const destination = `/paginas/${page.id}/`;
+      if (createFromShortcut) router.replace(destination);
+      else router.push(destination);
+    } catch {
+      creatingPage.current = false;
+      setCreating(false);
+      setCreateError('Não foi possível confirmar a criação da página. Tente novamente.');
     }
-  }, [searchParams]);
+  }, [createFromShortcut, router]);
+
+  useEffect(() => {
+    if (createFromShortcut) void createPage();
+  }, [createFromShortcut, createPage]);
 
   const fetchPages = () => {
     apiGet<any[]>('/pages')
@@ -39,11 +58,6 @@ function PaginasPageContent() {
   };
 
   useEffect(() => { fetchPages(); }, []);
-
-  const createPage = async () => {
-    const page = await apiPost<any>('/pages', { title: 'Nova Página' });
-    window.location.href = `/paginas/${page.id}`;
-  };
 
   const rootPages = pages.filter(p => !p.parentId);
   const totalPages = pages.length;
@@ -69,16 +83,19 @@ function PaginasPageContent() {
             </div>
           </div>
           <button
-            onClick={createPage}
+            type="button"
+            onClick={() => void createPage()}
+            disabled={creating}
             className="btn btn-primary"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            Nova Página
+            {creating ? 'Criando página…' : 'Nova Página'}
           </button>
         </div>
+        {createError && <p className="mb-4 text-sm text-[var(--color-danger)]" role="alert">{createError}</p>}
 
         {/* Content */}
         {loading ? (

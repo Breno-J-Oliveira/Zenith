@@ -33,7 +33,7 @@ async function signIn(page, credentials) {
   await email.waitFor();
   await email.fill(credentials.email);
   await password.fill(credentials.password);
-  await password.press('Enter');
+  await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 }
 
 async function verify() {
@@ -116,7 +116,31 @@ async function verify() {
     assert.ok(ownerToken, 'A conta proprietária deve receber um access token');
     const savedTask = await request(`${api}/tasks/${task.id}`, { token: ownerToken });
     assert.equal(savedTask.completed, true);
-    console.log('Jornada móvel validada: login, tentativa de captura, planejamento, conclusão, revisão e isolamento.');
+
+    await navigation.getByRole('link', { name: 'Calendário', exact: true }).click();
+    await page.getByRole('heading', { name: 'Calendário', exact: true }).waitFor();
+    await page.getByRole('region', { name: 'Agenda do dia' }).getByText(title, { exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Grade', exact: true }).click();
+    await page.getByText('✓ ' + title, { exact: true }).waitFor();
+
+    await navigation.getByText('Mais', { exact: true }).click();
+    await navigation.getByRole('link', { name: 'Páginas', exact: true }).click();
+    const newPage = api + '/pages';
+    const [created] = await Promise.all([
+      page.waitForResponse(response => response.url() === newPage && response.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Nova Página', exact: true }).click(),
+    ]);
+    assert.equal(created.status(), 201);
+    const { id: pageId } = await created.json();
+    await page.waitForURL(url => url.pathname === `/paginas/${pageId}/`);
+    const pageTitle = page.getByPlaceholder('Sem título', { exact: true });
+    await pageTitle.waitFor();
+    assert.equal(await pageTitle.inputValue(), 'Nova Página');
+    const savedPage = await request(`${api}/pages/${pageId}`, { token: ownerToken });
+    assert.equal(savedPage.title, 'Nova Página');
+    await request(`${api}/pages/${pageId}`, { token: visitorToken, expected: 404 });
+
+    console.log('Jornada móvel validada: login, recuperação da captura, planejamento, conclusão, revisão, calendário, criação de página e isolamento.');
   } finally {
     await browser.close();
   }

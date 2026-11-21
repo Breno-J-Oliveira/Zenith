@@ -6,7 +6,8 @@ O workflow [Verificar Zenith](../.github/workflows/verify.yml) valida instalaç�
 pelo lockfile no Linux, migrações em SQLite descartável, regressões da API,
 lint e build web. A jornada autenticada usa Chromium, banco descartável e duas
 contas fictícias no NexusAuth. Cobre login, perda de resposta na captura, nova
-tentativa sem duplicar, planejamento, conclusão, revisão e isolamento entre
+tentativa sem duplicar, planejamento, conclusão, revisão, calendário,
+criação de página sem perder a sessão e isolamento entre
 contas. Use o hash do commit aprovado como referência. O uso diário e as
 verificações em staging têm registros próprios.
 
@@ -66,12 +67,17 @@ verificações em staging têm registros próprios.
 - A atualização de `proxy-addr` para 2.0.8 e do bcrypt para 6.0.0 removeu
   dois alertas críticos. O bcrypt 6 validou um hash gerado pela versão 5 em
   contêiner Linux.
-- No candidato com Next.js 16, a auditoria da árvore de produção terminou
-  com zero críticos, 15 altos e 5 moderados após remover o CLI do shadcn e
-  pacotes do Tiptap sem uso no código do app. Antes da remoção, a mesma
-  árvore tinha 25 altos e 39 moderados. Rode `npm audit --omit=dev` no
-  workspace e na raiz isolada do NexusAuth antes de liberar uma versão.
-  Avalie os alertas restantes conforme os caminhos usados em produção.
+- No candidato com Next.js 16, a auditoria da árvore de produção caiu
+  de 25 para 12 alertas altos e de 39 para 5 moderados, com zero críticos.
+  O CLI do shadcn, pacotes do Tiptap e o Nodemailer saíram da árvore por
+  falta de uso no código. Os lockfiles passaram a usar `ip-address` 10.7.6
+  e `source-map-js` 1.2.4 onde aplicável. A instalação isolada do NexusAuth
+  registrou zero críticos, 9 altos e 4 moderados.
+- Rode `npm audit --omit=dev` no workspace e na raiz isolada do NexusAuth
+  antes de liberar uma versão. Avalie os alertas restantes conforme os
+  caminhos usados em produção. O NexusAuth gera os tokens de verificação e
+  recuperação. A entrega desses links por e-mail ainda precisa ser
+  implementada e validada no staging antes dos convites.
 
 ## Primeira sessão da beta
 
