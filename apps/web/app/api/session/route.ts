@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     const response = reply({ user: await user.json(), accessToken: access });
     return rotated ? cookies(request, response, rotated) : response;
   } catch (error) {
-    if (error instanceof NexusAuthError && error.status < 500) {
+    if (error instanceof NexusAuthError && error.status >= 400 && error.status < 500) {
       const response = reply({ message: error.message }, error.status);
       return input?.action !== 'login' && error.status === 401 ? cookies(request, response) : response;
     }

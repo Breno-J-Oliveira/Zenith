@@ -72,6 +72,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
+  const restoring = useRef(false);
+
   const applySession = useCallback((session: WebSession | null) => {
     clearTimeout(timer.current);
     saveTokens(session ? JSON.stringify({ accessToken: session.accessToken }) : null);
@@ -79,6 +81,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshUser = useCallback(async function restore() {
+    if (restoring.current) return;
+    restoring.current = true;
+    clearTimeout(timer.current);
     try {
       const session = await requestWebSession({ action: 'restore' });
       applySession(session);
@@ -86,6 +91,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       setState(prev => ({ ...prev, loading: false, error: 'Não foi possível confirmar a sessão.' }));
       timer.current = setTimeout(restore, 30_000);
+    } finally {
+      restoring.current = false;
     }
   }, [applySession]);
 

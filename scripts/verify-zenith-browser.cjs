@@ -150,6 +150,29 @@ async function verify() {
     assert.equal(savedPage.title, 'Nova Página');
     await request(`${api}/pages/${pageId}`, { token: visitorToken, expected: 404 });
 
+    await page.getByRole('button', { name: /adicionar bloco/i }).click();
+    await page.getByRole('button', { name: 'Texto', exact: true }).click();
+    const editor = page.getByRole('textbox', { name: 'Texto do bloco' });
+    const draft = 'Resumo fictício\nSegunda linha';
+    await editor.fill(draft);
+    let dropNextSave = true;
+    await page.route('**/pages/blocks/*', async route => {
+      if (dropNextSave && route.request().method() === 'PATCH') {
+        dropNextSave = false;
+        await route.abort();
+      } else {
+        await route.continue();
+      }
+    });
+    await page.getByRole('button', { name: 'Salvar bloco' }).click();
+    await page.getByText('Falha ao salvar. Seu texto foi mantido nesta página.').waitFor();
+    assert.equal(await editor.inputValue(), draft);
+    await page.getByRole('button', { name: 'Tentar salvar novamente' }).click();
+    await page.getByText('Bloco salvo.').waitFor();
+    await page.reload();
+    await editor.waitFor();
+    assert.equal(await editor.inputValue(), draft);
+
     await page.getByRole('button', { name: 'Menu da conta' }).click();
     await page.getByRole('button', { name: 'Sair', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/login/');

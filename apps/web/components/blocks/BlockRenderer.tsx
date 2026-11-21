@@ -1,7 +1,7 @@
 'use client';
 
 import { ListTodo, Target } from 'lucide-react';
-import { useState } from 'react';
+import { type FormEvent, useId, useRef, useState } from 'react';
 
 interface BlockData {
   id: string;
@@ -12,18 +12,16 @@ interface BlockData {
 
 interface BlockRendererProps {
   block: BlockData;
-  onUpdate: (id: string, content: any) => void;
+  onUpdate: (id: string, content: any) => Promise<void>;
   onDelete: (id: string) => void;
 }
 
 export function BlockRenderer({ block, onUpdate, onDelete }: BlockRendererProps) {
   switch (block.type) {
     case 'heading':
-      return <HeadingBlock block={block} onUpdate={onUpdate} onDelete={onDelete} />;
     case 'text':
-      return <TextBlock block={block} onUpdate={onUpdate} onDelete={onDelete} />;
     case 'todo':
-      return <TodoBlock block={block} onUpdate={onUpdate} onDelete={onDelete} />;
+      return <EditableTextBlock block={block} onUpdate={onUpdate} onDelete={onDelete} />;
     case 'task_ref':
       return <TaskRefBlock block={block} onDelete={onDelete} />;
     case 'goal_ref':
@@ -49,90 +47,60 @@ function BlockWrapper({ children, onDelete, onDragStart }: { children: React.Rea
   );
 }
 
-function HeadingBlock({ block, onUpdate, onDelete }: { block: BlockData; onUpdate: (id: string, content: any) => void; onDelete: (id: string) => void }) {
-  const [text, setText] = useState(block.content.text || '');
-  const level = block.content.level || 1;
+function EditableTextBlock({ block, onUpdate, onDelete }: BlockRendererProps) {
+  const [text, setText] = useState<string>(block.content.text ?? '');
+  const [checked, setChecked] = useState<boolean>(block.content.checked ?? false);
+  const [saved, setSaved] = useState({ text, checked });
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const inFlight = useRef(false);
+  const id = useId();
+  const todo = block.type === 'todo';
+  const heading = block.type === 'heading';
+  const label = heading ? 'Título do bloco' : todo ? 'Texto do item' : 'Texto do bloco';
+  const dirty = text !== saved.text || checked !== saved.checked;
 
-  const handleBlur = () => {
-    if (text !== (block.content.text || '')) {
-      onUpdate(block.id, { ...block.content, text });
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (inFlight.current || !dirty) return;
+    inFlight.current = true;
+    setStatus('saving');
+    try {
+      await onUpdate(block.id, { ...block.content, text, ...(todo && { checked }) });
+      setSaved({ text, checked });
+      setStatus('saved');
+    } catch {
+      setStatus('error');
+    } finally {
+      inFlight.current = false;
     }
-  };
+  }
 
-  const Tag = `h${level}` as keyof React.JSX.IntrinsicElements;
-
+  const fieldClass = `input min-w-0 w-full ${heading ? 'font-bold text-primary' : ''} ${todo && checked ? 'line-through' : ''}`;
   return (
     <BlockWrapper onDelete={() => onDelete(block.id)}>
-      <Tag
-        className="font-mono text-primary font-bold outline-none bg-transparent w-full"
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={handleBlur}
-        defaultValue={text}
-      >
-        {text}
-      </Tag>
-    </BlockWrapper>
-  );
-}
-
-function TextBlock({ block, onUpdate, onDelete }: { block: BlockData; onUpdate: (id: string, content: any) => void; onDelete: (id: string) => void }) {
-  const [text, setText] = useState(block.content.text || '');
-
-  const handleBlur = () => {
-    if (text !== (block.content.text || '')) {
-      onUpdate(block.id, { ...block.content, text });
-    }
-  };
-
-  return (
-    <BlockWrapper onDelete={() => onDelete(block.id)}>
-      <div
-        className="font-mono text-sm text-dim outline-none bg-transparent w-full min-h-[1.5em]"
-        contentEditable
-        suppressContentEditableWarning
-        onBlur={handleBlur}
-      >
-        {text}
-      </div>
-    </BlockWrapper>
-  );
-}
-
-function TodoBlock({ block, onUpdate, onDelete }: { block: BlockData; onUpdate: (id: string, content: any) => void; onDelete: (id: string) => void }) {
-  const [checked, setChecked] = useState(block.content.checked || false);
-  const [text, setText] = useState(block.content.text || '');
-
-  const toggle = () => {
-    const newChecked = !checked;
-    setChecked(newChecked);
-    onUpdate(block.id, { ...block.content, checked: newChecked });
-  };
-
-  const handleBlur = () => {
-    if (text !== (block.content.text || '')) {
-      onUpdate(block.id, { ...block.content, text });
-    }
-  };
-
-  return (
-    <BlockWrapper onDelete={() => onDelete(block.id)}>
-      <div className="flex items-center gap-2">
-        <input
-          type="checkbox"
-          checked={checked}
-          onChange={toggle}
-          className="accent-[var(--color-primary)]"
-        />
-        <span
-          className={`font-mono text-sm outline-none bg-transparent flex-1 ${checked ? 'line-through text-dim opacity-50' : 'text-dim'}`}
-          contentEditable
-          suppressContentEditableWarning
-          onBlur={handleBlur}
-        >
-          {text}
-        </span>
-      </div>
+      <form onSubmit={save} className="min-w-0 space-y-2" aria-busy={status === 'saving'}>
+        <div className="flex items-start gap-2">
+          {todo && (
+            <input type="checkbox" aria-label="Item concluído" className="mt-3 accent-[var(--color-primary)]"
+              checked={checked} onChange={event => setChecked(event.target.checked)} />
+          )}
+          <label htmlFor={id} className="sr-only">{label}</label>
+          {block.type === 'text' ? (
+            <textarea id={id} rows={2} value={text} className={fieldClass} placeholder="Escreva um texto"
+              onChange={event => setText(event.target.value)} />
+          ) : (
+            <input id={id} value={text} className={fieldClass} placeholder={label}
+              onChange={event => setText(event.target.value)} />
+          )}
+        </div>
+        {dirty && (
+          <button type="submit" disabled={status === 'saving'} className="btn btn-secondary min-h-11">
+            {status === 'saving' ? 'Salvando…' : status === 'error' ? 'Tentar salvar novamente' : 'Salvar bloco'}
+          </button>
+        )}
+        {status === 'error' && <p role="alert" className="text-sm text-[var(--color-danger)]">Falha ao salvar. Seu texto foi mantido nesta página.</p>}
+        {status === 'saved' && !dirty && <p role="status" className="text-sm text-dim">Bloco salvo.</p>}
+      </form>
     </BlockWrapper>
   );
 }
@@ -159,7 +127,7 @@ function GoalRefBlock({ block, onDelete }: { block: BlockData; onDelete: (id: st
   );
 }
 
-function ImageBlock({ block, onUpdate, onDelete }: { block: BlockData; onUpdate: (id: string, content: any) => void; onDelete: (id: string) => void }) {
+function ImageBlock({ block, onUpdate, onDelete }: { block: BlockData; onUpdate: (id: string, content: any) => Promise<void>; onDelete: (id: string) => void }) {
   const [url, setUrl] = useState(block.content.url || '');
 
   const handleBlur = () => {

@@ -30,6 +30,11 @@ verificações em staging têm registros próprios.
 
 ## Configuração e recuperação
 
+- Configure `ZENITH_WEB_ORIGIN` com a origem pública HTTPS exata da web,
+  sem barra final. O endpoint de sessão usa essa origem para autorizar
+  requisições e marcar os cookies como `Secure`. Defina `NEXUS_AUTH_URL` e
+  `ZENITH_API_URL` se a web precisar usar endereços internos para alcançar as
+  APIs. Valide login, recarga, rotação e logout atrás do proxy de staging.
 - Defina `NODE_ENV=production` na API Zenith. Se a web e a API tiverem
   origens distintas, configure `CORS_ORIGINS` nas duas APIs com a origem
   completa da web, por exemplo `https://beta.zenith.example`. Confirme o

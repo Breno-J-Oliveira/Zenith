@@ -1,16 +1,6 @@
 'use client';
 
-/**
- * AuthEventsListener — Listener global para eventos de auth.
- *
- * Ouve o evento `zenith:auth:logout` (disparado pelo `lib/api.ts`
- * quando recebe 401) e o evento `zenith:auth:refresh` (futuro).
- *
- * O logout é centralizado aqui para que qualquer ponto da app
- * (api, componentes, etc.) possa disparar sem ter de importar
- * o `AuthProvider` (que é um hook).
- */
-
+/** Reconcilia a sessão quando a API recusa o access token atual. */
 import { useEffect } from 'react';
 import { useAuth } from './AuthProvider';
 
@@ -22,14 +12,14 @@ export function AuthEventsListener() {
   const { refreshUser } = useAuth();
 
   useEffect(() => {
-    const handleLogout = () => {
+    const restoreSession = () => {
       void refreshUser();
     };
 
-    window.addEventListener('zenith:auth:logout', handleLogout);
+    window.addEventListener('zenith:auth:logout', restoreSession);
 
     return () => {
-      window.removeEventListener('zenith:auth:logout', handleLogout);
+      window.removeEventListener('zenith:auth:logout', restoreSession);
     };
   }, [refreshUser]);
 

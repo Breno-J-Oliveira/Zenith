@@ -200,7 +200,7 @@ export default function PageEditorClient({ id }: { id: string }) {
 
 function SortableBlock({ block, onUpdate, onDelete }: {
   block: BlockData;
-  onUpdate: (id: string, content: any) => void;
+  onUpdate: (id: string, content: any) => Promise<void>;
   onDelete: (id: string) => void;
 }) {
   const {
