@@ -24,6 +24,8 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
   ACCOUNT_LINK_ORIGIN: z.string().optional(),
+  TURNSTILE_SECRET_KEY: z.string().optional(),
+  TURNSTILE_EXPECTED_HOSTNAME: z.string().optional(),
 
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
@@ -64,11 +66,25 @@ export function validateEnv(config: Record<string, unknown>) {
   }
 
   const data = parsed.data;
+  if (data.NODE_ENV === 'production') {
+    if (data.REQUIRE_EMAIL_VERIFIED === 'true' && !data.SMTP_HOST?.trim()) {
+      throw new Error('Configure SMTP_HOST em produção com verificação de e-mail obrigatória.');
+    }
+    if (data.TURNSTILE_SECRET_KEY && !data.TURNSTILE_EXPECTED_HOSTNAME?.trim()) {
+      throw new Error('Configure TURNSTILE_EXPECTED_HOSTNAME ao usar o Turnstile em produção.');
+    }
+  }
+
   if (data.SMTP_HOST) {
     if (!z.string().email().safeParse(data.SMTP_FROM).success || !data.ACCOUNT_LINK_ORIGIN) {
       throw new Error('Configure SMTP_FROM e ACCOUNT_LINK_ORIGIN para o envio de links de conta.');
     }
-    const origin = new URL(data.ACCOUNT_LINK_ORIGIN);
+    let origin: URL;
+    try {
+      origin = new URL(data.ACCOUNT_LINK_ORIGIN);
+    } catch {
+      throw new Error('ACCOUNT_LINK_ORIGIN deve ser uma origem válida.');
+    }
     const local = origin.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname);
     if (origin.origin !== data.ACCOUNT_LINK_ORIGIN ||
         (origin.protocol !== 'https:' && !(data.NODE_ENV !== 'production' && local))) {

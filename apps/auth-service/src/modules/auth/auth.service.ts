@@ -429,7 +429,7 @@ export class AuthService {
     await this.prisma.$transaction(async tx => {
       const changed = await tx.user.updateMany({
         where: { id: user.id, password: user.password },
-        data: { password: newHash, passwordHistory: newHistory },
+        data: { password: newHash, passwordHistory: newHistory, emailVerified: true },
       });
       if (changed.count !== 1) throw new BadRequestException({ code: 'INVALID_RESET_TOKEN', message: 'Request a new reset link' });
       const consumed = await tx.passwordReset.updateMany({
@@ -438,6 +438,9 @@ export class AuthService {
       });
       if (consumed.count !== 1) throw new BadRequestException({ code: 'INVALID_RESET_TOKEN', message: 'Invalid or expired reset token' });
       await tx.passwordReset.updateMany({ where: { userId: user.id, used: false }, data: { used: true } });
+      if (!user.emailVerified) {
+        await tx.emailVerification.updateMany({ where: { userId: user.id, used: false }, data: { used: true } });
+      }
       await tx.session.updateMany({ where: { userId: user.id, active: true }, data: { active: false } });
       await tx.refreshToken.updateMany({ where: { userId: user.id, revoked: false }, data: { revoked: true } });
     });
@@ -504,7 +507,7 @@ export class AuthService {
     return { accessToken, refreshToken: rawRefreshToken };
   }
 
-  async verifyEmail(token: string, ipAddress?: string) {
+  async verifyEmail(token: string, password: string, ipAddress?: string) {
     if (!token || typeof token !== 'string') {
       throw new BadRequestException({ code: 'INVALID_VERIFICATION_TOKEN', message: 'Invalid verification token' });
     }
@@ -515,13 +518,22 @@ export class AuthService {
       await this.checkGenericRateLimit(`ratelimit:verify-email:ip:${ipAddress}`, 10, 60);
     }
     const hashedToken = hashToken(token);
-    const verification = await this.prisma.emailVerification.findUnique({ where: { token: hashedToken } });
+    const verification = await this.prisma.emailVerification.findUnique({
+      where: { token: hashedToken },
+      include: { user: { select: { password: true } } },
+    });
     if (!verification) throw new BadRequestException({ code: 'INVALID_VERIFICATION_TOKEN', message: 'Invalid verification token' });
     if (verification.used) throw new BadRequestException({ code: 'VERIFICATION_TOKEN_ALREADY_USED', message: 'Verification token has already been used' });
     if (verification.expiresAt < new Date()) throw new BadRequestException({ code: 'VERIFICATION_TOKEN_EXPIRED', message: 'Verification token has expired' });
+
+    // A posse do link não ativa uma senha escolhida por outra pessoa no cadastro.
+    const registeredPassword = verification.user.password;
+    if (!registeredPassword || !await bcrypt.compare(password, registeredPassword)) {
+      throw new BadRequestException({ code: 'VERIFICATION_PASSWORD_MISMATCH', message: 'Request a password reset to confirm this address.' });
+    }
     await this.prisma.$transaction(async tx => {
       const user = await tx.user.updateMany({
-        where: { id: verification.userId, emailVerified: false },
+        where: { id: verification.userId, emailVerified: false, password: registeredPassword },
         data: { emailVerified: true },
       });
       if (user.count !== 1) {

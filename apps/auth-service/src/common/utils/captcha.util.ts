@@ -14,7 +14,7 @@ const TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/sit
  *
  * Without TURNSTILE_SECRET_KEY set, CAPTCHA verification is SKIPPED.
  * This is intentional — the project should work out of the box in dev.
- * Production MUST set this to prevent bot registrations.
+ * Production requires the secret and the expected hostname.
  */
 export async function verifyCaptcha(
   token: string,
@@ -39,6 +39,14 @@ export async function verifyCaptcha(
     return;
   }
 
+  const expectedHostname = process.env.TURNSTILE_EXPECTED_HOSTNAME?.trim();
+  if (process.env.NODE_ENV === 'production' && !expectedHostname) {
+    throw new BadRequestException({
+      code: 'CAPTCHA_NOT_CONFIGURED',
+      message: 'CAPTCHA verification is not configured on the server',
+    });
+  }
+
   // SECURITY: Validate token length to prevent abuse
   if (!token || typeof token !== 'string' || token.length < 10 || token.length > 2048) {
     throw new BadRequestException({
@@ -54,38 +62,31 @@ export async function verifyCaptcha(
     formData.append('remoteip', ipAddress);
   }
 
-  let result: { success: boolean; hostname?: string; action?: string; 'error-codes'?: string[] };
+  let result: { success: boolean; hostname?: string; action?: string };
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
     const response = await fetch(TURNSTILE_VERIFY_URL, {
       method: 'POST',
       body: formData,
-      signal: controller.signal,
+      signal: AbortSignal.timeout(5_000),
     });
-
-    clearTimeout(timeout);
 
     if (!response.ok) {
       throw new Error(`Turnstile API returned HTTP ${response.status}`);
     }
 
     result = await response.json();
-  } catch (err: any) {
+  } catch {
     // SECURITY: Fail closed — if CAPTCHA service is unreachable, reject
-    Logger.error(`Turnstile verification failed: ${err.message}`, 'CaptchaGuard');
+    Logger.error('Turnstile verification service unavailable.', 'CaptchaGuard');
     throw new BadRequestException({
       code: 'CAPTCHA_SERVICE_UNAVAILABLE',
       message: 'CAPTCHA verification service is temporarily unavailable. Please try again.',
     });
   }
 
-  const expectedHostname = process.env.TURNSTILE_EXPECTED_HOSTNAME;
-  if (result.success !== true || (expectedHostname &&
+  if (result?.success !== true || (expectedHostname &&
       (result.hostname !== expectedHostname || result.action !== 'zenith_register'))) {
-    const errorCodes = result['error-codes']?.join(', ') || 'unknown';
-    Logger.warn(`CAPTCHA verification failed: ${errorCodes}`, 'CaptchaGuard');
+    Logger.warn('CAPTCHA verification failed.', 'CaptchaGuard');
     throw new BadRequestException({
       code: 'CAPTCHA_FAILED',
       message: 'CAPTCHA verification failed. Please try again.',

@@ -61,14 +61,17 @@ verificações em staging têm registros próprios.
   final. No NexusAuth, defina `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` e, quando
   exigidos pelo servidor, `SMTP_USER` e `SMTP_PASS`. Use TLS direto na porta 465
   ou servidor com STARTTLS. Confirme que `REQUIRE_EMAIL_VERIFIED=true`.
-- O cadastro web aguarda a confirmação do endereço. O usuário pode solicitar
+- O cadastro web aguarda a confirmação do endereço com a senha do cadastro.
+  Se a pessoa não reconhece essa senha, a recuperação pelo e-mail permite
+  escolher outra e confirmar a posse do endereço. A pessoa pode solicitar
   outro link no login, inclusive após falha de entrega. O transporte registra
   a categoria da falha sem incluir destinatário ou token. A fila em memória
   é limitada e pode perder envios se o processo parar. Reenvio e recuperação
   são as rotas para pedir um novo link nessas condições.
-- A redefinição revoga as sessões e os refresh tokens no NexusAuth. Um JWT
-  já emitido pode ser aceito até expirar em serviços que validam apenas sua
-  assinatura. Verifique o comportamento ponta a ponta no staging.
+- A redefinição revoga as sessões e os refresh tokens no NexusAuth. Nas rotas
+  privadas, a API Zenith também consulta a sessão no NexusAuth. Se o serviço
+  estiver indisponível, a API responde com HTTP 503. Valide a revogação e
+  meça o tempo de resposta da jornada no staging.
 - O CI usa um coletor SMTP descartável. A entrega em caixas reais, as
   configurações de remetente e as chaves reais de CAPTCHA exigem validação
   no staging. Confirme também os links de login social antes dos convites.

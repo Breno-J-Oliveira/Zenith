@@ -1,39 +1,36 @@
 /**
- * NexusAuthGuard — Valida JWT do NexusAuth em todas as rotas protegidas.
- *
- * Fluxo:
- *  1. Extrai o JWT do header `Authorization: Bearer <token>`
- *  2. Chama `JwksService.verifyToken()` para validar a assinatura RS256
- *  3. Anexa o payload do JWT em `request.user`
- *  4. Auto-cria o User no Zenith caso ainda não exista (idempotente)
- *
- * Para tornar uma rota pública, usar o decorator `@Public()`.
+ * Valida localmente a assinatura do JWT e consulta a sessão autoritativa
+ * no NexusAuth antes de sincronizar o usuário.
  */
 
 import {
   CanActivate,
   ExecutionContext,
   Injectable,
-  Logger,
-  UnauthorizedException,
+  ServiceUnavailableException,
   SetMetadata,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
+import type { ZenithUser } from './current-user.decorator';
 import { JwksService, NexusJwtPayload } from './jwks.service';
 import { UserSyncService } from './user-sync.service';
+import { ZenithAuthClient } from './zenith-auth-client';
+
+const validated = Symbol('validated NexusAuth request');
+type AuthenticatedRequest = Request & { user?: NexusJwtPayload; zenithUser?: ZenithUser; [validated]?: true };
 
 export const IS_PUBLIC_KEY = 'isPublic';
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
 
 @Injectable()
 export class NexusAuthGuard implements CanActivate {
-  private readonly logger = new Logger(NexusAuthGuard.name);
-
   constructor(
     private readonly reflector: Reflector,
     private readonly jwksService: JwksService,
     private readonly userSyncService: UserSyncService,
+    private readonly nexus: ZenithAuthClient,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -43,9 +40,10 @@ export class NexusAuthGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest<Request & { user?: NexusJwtPayload }>();
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    // O mesmo request pode passar pela guarda global e pela guarda do controller.
+    if (request[validated]) return true;
     const token = this.extractToken(request);
-
     if (!token) {
       throw new UnauthorizedException('Token de autenticação não fornecido');
     }
@@ -53,18 +51,16 @@ export class NexusAuthGuard implements CanActivate {
     let payload: NexusJwtPayload;
     try {
       payload = await this.jwksService.verifyToken(token);
-    } catch (err) {
-      this.logger.warn(`JWT inválido: ${(err as Error).message}`);
-      throw new UnauthorizedException(`Token inválido: ${(err as Error).message}`);
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) throw error;
+      throw new UnauthorizedException('Token de autenticação inválido');
     }
 
-    // Sincroniza o User no Zenith com base no JWT (idempotente)
+    await this.nexus.assertActiveSession(token, payload.sub);
     const user = await this.userSyncService.syncFromJwt(payload);
-
-    // Anexa o user à request para uso nos controllers
     request.user = payload;
-    (request as any).zenithUser = user;
-
+    request.zenithUser = user;
+    request[validated] = true;
     return true;
   }
 

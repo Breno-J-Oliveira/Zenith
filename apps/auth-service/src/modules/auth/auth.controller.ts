@@ -31,7 +31,10 @@ import { z } from 'zod';
 const verifyTokenSchema = z.object({
   token: z.string().uuid(),
 });
-type verifyTokenDto = z.infer<typeof verifyTokenSchema>;
+const verifyEmailSchema = verifyTokenSchema.extend({
+  password: z.string().min(1).max(128),
+});
+type VerifyEmailDto = z.infer<typeof verifyEmailSchema>;
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -163,12 +166,12 @@ export class AuthController {
   @HttpCode(200)
   @ApiOperation({ summary: 'Verificar email com token' })
   async verifyEmail(
-    @Body(new ZodValidationPipe(verifyTokenSchema)) dto: { token: string },
+    @Body(new ZodValidationPipe(verifyEmailSchema)) dto: VerifyEmailDto,
     @Req() req: Request,
   ) {
     // V41 FIX: pass ipAddress for rate limit
     const ipAddress = req.ip || 'unknown';
-    return this.authService.verifyEmail(dto.token, ipAddress);
+    return this.authService.verifyEmail(dto.token, dto.password, ipAddress);
   }
 
   @Post('logout')

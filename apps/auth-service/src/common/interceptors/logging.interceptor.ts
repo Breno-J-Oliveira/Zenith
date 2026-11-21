@@ -28,15 +28,19 @@ const SENSITIVE_PARAMS = [
   'pwd',
   'secret',
   'authorization',
+  'email',
+  'captchatoken',
+  'captcha_token',
 ];
 
 // A9 FIX: Sensitive body fields that must be redacted before logging.
 // These carry authentication tokens and secrets in request bodies.
 const SENSITIVE_BODY_FIELDS = new Set([
-  'password', 'currentPassword', 'newPassword', 'confirmPassword',
-  'refreshToken', 'challengeToken', 'token',
-  'secret', 'code', 'key', 'apiKey', 'api_key',
-  'authorization', 'accessToken', 'access_token',
+  'password', 'currentpassword', 'newpassword', 'confirmpassword',
+  'refreshtoken', 'challengetoken', 'token',
+  'secret', 'code', 'key', 'apikey', 'api_key',
+  'authorization', 'accesstoken', 'access_token',
+  'email', 'captchatoken', 'captcha_token',
 ]);
 
 function sanitizeBody(body: unknown): unknown {
@@ -45,7 +49,7 @@ function sanitizeBody(body: unknown): unknown {
 
   const sanitized: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(body as Record<string, unknown>)) {
-    if (SENSITIVE_BODY_FIELDS.has(key)) {
+    if (SENSITIVE_BODY_FIELDS.has(key.toLowerCase())) {
       sanitized[key] = '[REDACTED]';
     } else if (typeof value === 'object' && value !== null) {
       sanitized[key] = sanitizeBody(value);
@@ -89,10 +93,10 @@ export class LoggingInterceptor implements NestInterceptor {
     res.setHeader('x-request-id', correlationId);
 
     const startTime = Date.now();
-    // V44 FIX: never log raw URL with sensitive query parameters
-    const safePath = sanitizeUrl(req.originalUrl || req.url || '');
-    // A9 FIX: sanitize request body to redact sensitive fields (passwords, tokens, secrets)
-    const safeBody = sanitizeBody((req as any).body);
+    // Rotas de conta só registram metadados, inclusive quando a operação falha.
+    const isAccountRoute = /^\/auth(?:\/|$)/i.test(req.path);
+    const safePath = isAccountRoute ? req.path : sanitizeUrl(req.originalUrl || req.url || '');
+    const payload = isAccountRoute ? {} : { body: sanitizeBody(req.body) };
 
     return next.handle().pipe(
       tap({
@@ -104,7 +108,7 @@ export class LoggingInterceptor implements NestInterceptor {
             path: safePath,
             statusCode: res.statusCode,
             durationMs: duration,
-            body: safeBody,
+            ...payload,
           });
         },
         error: (err) => {
@@ -115,8 +119,8 @@ export class LoggingInterceptor implements NestInterceptor {
             path: safePath,
             statusCode: err.status || 500,
             durationMs: duration,
-            error: err.message,
-            body: safeBody,
+            ...(isAccountRoute ? {} : { error: err.message }),
+            ...payload,
           });
         },
       }),

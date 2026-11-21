@@ -55,9 +55,24 @@ async function mailLink(email, kind, previousMessageId) {
 async function confirmedFixture(name) {
   const credentials = fixtureCredentials();
   await request(auth + '/auth/register', { body: { ...credentials, name }, expected: 201 });
-  const { url } = await mailLink(credentials.email, 'verification');
-  await request(auth + '/auth/verify-email', { body: { token: url.hash.slice(1) } });
-  return credentials;
+  const verification = await mailLink(credentials.email, 'verification');
+  const chosenPassword = credentials.password + '!Dono8';
+  const mismatch = await request(auth + '/auth/verify-email', {
+    body: { token: verification.url.hash.slice(1), password: chosenPassword },
+    expected: 400,
+  });
+  assert.equal(mismatch.code, 'VERIFICATION_PASSWORD_MISMATCH');
+  await request(auth + '/auth/forgot-password', { body: { email: credentials.email }, expected: 201 });
+  const { url } = await mailLink(credentials.email, 'reset');
+  await request(auth + '/auth/reset-password', {
+    body: { token: url.hash.slice(1), newPassword: chosenPassword },
+    expected: 201,
+  });
+  await request(auth + '/auth/verify-email', {
+    body: { token: verification.url.hash.slice(1), password: credentials.password },
+    expected: 400,
+  });
+  return { ...credentials, password: chosenPassword };
 }
 
 async function registerFromBrowser(page, credentials) {
@@ -112,16 +127,17 @@ async function registerFromBrowser(page, credentials) {
   await confirmation.waitFor();
   assert.equal(new URL(page.url()).hash, '');
   assert.equal(clickedVerificationRequests, 0, 'Abrir o link não deve confirmar o e-mail');
+  await page.getByLabel('Senha do cadastro').fill(credentials.password);
   await confirmation.click();
   await page.getByText('E-mail confirmado. Sua conta está pronta para entrar.').waitFor();
   assert.equal(clickedVerificationRequests, 1);
-  await request(auth + '/auth/verify-email', { body: { token: first.url.hash.slice(1) }, expected: 400 });
+  await request(auth + '/auth/verify-email', { body: { token: first.url.hash.slice(1), password: credentials.password }, expected: 400 });
   const generic = await request(auth + '/auth/resend-verification', { body: { email: 'missing@example.com' }, expected: 202 });
   const verified = await request(auth + '/auth/resend-verification', { body: { email: credentials.email }, expected: 202 });
   assert.deepEqual(verified, generic);
 }
 
-async function verifyPasswordRecovery(page, owner, previousRefreshToken) {
+async function verifyPasswordRecovery(page, owner, previousSession) {
   await page.goto(web + '/forgot-password/');
   await page.getByLabel('E-mail', { exact: true }).fill(owner.email);
   await page.getByRole('button', { name: 'Solicitar link', exact: true }).click();
@@ -140,7 +156,8 @@ async function verifyPasswordRecovery(page, owner, previousRefreshToken) {
   await confirmation.fill(newPassword);
   await save.click();
   await page.getByText('Senha alterada. Entre com sua nova senha.').waitFor();
-  await request(auth + '/auth/refresh', { body: { refreshToken: previousRefreshToken }, expected: 401 });
+  await request(auth + '/auth/refresh', { body: { refreshToken: previousSession.refreshToken }, expected: 401 });
+  await request(api + '/auth/me', { token: previousSession.accessToken, expected: 401 });
   await request(auth + '/auth/reset-password', { body: { token: url.hash.slice(1), newPassword }, expected: 400 });
   await request(auth + '/auth/login', { body: owner, expected: 401 });
   await page.getByRole('link', { name: 'Entrar no Zenith', exact: true }).click();
@@ -244,8 +261,7 @@ async function verify() {
     assert.ok(rotated?.value && rotated.value !== refresh.value, 'O NexusAuth deve rotacionar o refresh');
 
     await request(`${api}/tasks/${task.id}`, { token: visitorToken, expected: 404 });
-    const ownerSession = await request(auth + '/auth/login', { body: owner });
-    const ownerToken = ownerSession.accessToken;
+    const ownerToken = (await context.cookies()).find(cookie => cookie.name === 'zenith_access')?.value;
     assert.ok(ownerToken, 'A conta proprietária deve receber um access token');
     const savedTask = await request(`${api}/tasks/${task.id}`, { token: ownerToken });
     assert.equal(savedTask.completed, true);
@@ -272,6 +288,18 @@ async function verify() {
     const savedPage = await request(`${api}/pages/${pageId}`, { token: ownerToken });
     assert.equal(savedPage.title, 'Nova Página');
     await request(`${api}/pages/${pageId}`, { token: visitorToken, expected: 404 });
+    await request(api + '/pages', {
+      token: visitorToken,
+      body: { title: 'Página fictícia em outra conta', parentId: pageId },
+      expected: 404,
+    });
+    const child = await request(api + '/pages', {
+      token: ownerToken,
+      body: { title: 'Página filha fictícia', parentId: pageId },
+      expected: 201,
+    });
+    const hierarchy = await request(`${api}/pages/${pageId}`, { token: ownerToken });
+    assert.deepEqual(hierarchy.children, [child.id]);
 
     await page.getByRole('button', { name: /adicionar bloco/i }).click();
     await page.getByRole('button', { name: 'Texto', exact: true }).click();
@@ -296,13 +324,18 @@ async function verify() {
     await editor.waitFor();
     assert.equal(await editor.inputValue(), draft);
 
+    const signedOutToken = (await context.cookies()).find(cookie => cookie.name === 'zenith_access')?.value;
+    assert.ok(signedOutToken, 'O logout deve ser verificado com a sessão que estava ativa');
     await page.getByRole('button', { name: 'Menu da conta' }).click();
     await page.getByRole('button', { name: 'Sair', exact: true }).click();
     await page.waitForURL(url => url.pathname === '/login/');
     assert.equal((await context.cookies()).some(cookie => cookie.name === 'zenith_refresh'), false);
+    await request(api + '/auth/me', { token: signedOutToken, expected: 401 });
     await page.goto(web + '/hoje/');
     await page.waitForURL(url => url.pathname === '/login/');
-    await verifyPasswordRecovery(page, owner, ownerSession.refreshToken);
+    const ownerSession = await request(auth + '/auth/login', { body: owner });
+    await request(api + '/auth/me', { token: ownerSession.accessToken });
+    await verifyPasswordRecovery(page, owner, ownerSession);
     console.log('Cadastro com confirmação, reenvio e recuperação de senha validados pelo SMTP de teste.');
     console.log('Jornada móvel validada: recarga com sessão, rotação, logout e rotina com isolamento.');
   } finally {

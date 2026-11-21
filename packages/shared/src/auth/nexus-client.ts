@@ -10,7 +10,7 @@
  *   POST /auth/refresh         { refreshToken }           → { accessToken, refreshToken, sessionId }
  *   POST /auth/logout          { refreshToken }           → 204
  *   GET  /auth/me                                          → { id, email, name, role }
- *   POST /auth/verify-email    { token }                  → 200
+ *   POST /auth/verify-email    { token, password }                  → 200
  *   POST /auth/forgot-password { email }                  → 200
  *   POST /auth/reset-password  { token, newPassword }        → 200
  *   POST /auth/magic-link      { email }                  → 200
@@ -119,8 +119,8 @@ export class NexusAuthClient {
     });
   }
 
-  async verifyEmail(token: string): Promise<void> {
-    await this.request('POST', '/auth/verify-email', { token });
+  async verifyEmail(token: string, password: string): Promise<void> {
+    await this.request('POST', '/auth/verify-email', { token, password });
   }
 
   async forgotPassword(email: string): Promise<void> {

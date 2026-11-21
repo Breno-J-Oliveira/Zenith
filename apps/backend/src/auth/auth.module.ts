@@ -18,7 +18,8 @@
 import { Global, Module } from '@nestjs/common';
 import { JwksService } from './jwks.service';
 import { UserSyncService } from './user-sync.service';
-import { AuthController, ZenithAuthClient } from './auth.controller';
+import { AuthController } from './auth.controller';
+import { ZenithAuthClient } from './zenith-auth-client';
 import { NexusAuthGuard } from './auth.guard';
 
 @Global()

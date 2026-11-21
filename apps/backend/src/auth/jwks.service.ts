@@ -10,7 +10,7 @@
  *  - Em produção, JWKS URIs DEVEM ser HTTPS (validação automática)
  */
 
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
@@ -43,6 +43,7 @@ export class JwksService implements OnModuleInit {
   private readonly logger = new Logger(JwksService.name);
   private cache: Map<string, string> = new Map(); // kid → PEM
   private lastFetch = 0;
+  private fetchingKeys?: Promise<void>;
   private readonly cacheTtlMs = 60 * 60 * 1000; // 1h
 
   private nexusAuthUrl: string = '';
@@ -121,19 +122,28 @@ export class JwksService implements OnModuleInit {
     const now = Date.now();
     if (this.cache.size > 0 && now - this.lastFetch < this.cacheTtlMs) return;
 
-    const res = await fetch(this.jwksUri);
-    if (!res.ok) throw new Error(`JWKS fetch falhou: HTTP ${res.status}`);
-
-    const jwks: { keys: JwkKey[] } = await res.json();
-    this.cache.clear();
-
-    for (const key of jwks.keys) {
-      const pem = jwkToPem(key);
-      this.cache.set(key.kid, pem);
+    if (!this.fetchingKeys) {
+      this.fetchingKeys = this.fetchKeys().finally(() => {
+        this.fetchingKeys = undefined;
+      });
     }
+    await this.fetchingKeys;
+  }
 
-    this.lastFetch = now;
-    this.logger.log(`JWKS atualizado: ${this.cache.size} chave(s) carregada(s)`);
+  private async fetchKeys(): Promise<void> {
+    try {
+      const res = await fetch(this.jwksUri, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) throw new Error('Resposta inválida do JWKS');
+      const jwks: { keys: JwkKey[] } = await res.json();
+      const keys = new Map(jwks.keys.map(key => [key.kid, jwkToPem(key)]));
+      if (keys.size === 0) throw new Error('JWKS sem chaves');
+
+      this.cache = keys;
+      this.lastFetch = Date.now();
+      this.logger.log(`JWKS atualizado: ${keys.size} chave(s) carregada(s)`);
+    } catch {
+      throw new ServiceUnavailableException('Serviço de autenticação indisponível');
+    }
   }
 
   private async refreshKeys(): Promise<void> {
