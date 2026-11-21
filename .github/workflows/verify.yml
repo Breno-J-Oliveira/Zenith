@@ -52,3 +52,24 @@ jobs:
         run: |
           npm run build --workspace=apps/web
           git diff --exit-code -- package-lock.json
+      - name: Conferir redirecionamento da sessão no build de produção
+        shell: bash
+        run: |
+          npm run start --workspace=apps/web -- --hostname 127.0.0.1 --port 3129 > "$RUNNER_TEMP/zenith-web.log" 2>&1 &
+          service=$!
+          trap 'kill "$service" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3129/login/ > /dev/null; then break; fi
+            sleep 1
+          done
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const url = 'http://127.0.0.1:3129';
+          const route = '/hoje/?new=true';
+          const protectedRoute = await fetch(url + route, { redirect: 'manual', signal: AbortSignal.timeout(5000) });
+          assert.equal(protectedRoute.status, 307);
+          const login = new URL(protectedRoute.headers.get('location'), url);
+          assert.equal(login.pathname, '/login/');
+          assert.equal(login.searchParams.get('next'), route);
+          assert.equal((await fetch(login)).status, 200);
+          JS
