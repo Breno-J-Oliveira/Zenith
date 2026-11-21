@@ -60,12 +60,14 @@ com o NexusAuth e o piloto continuam com verificações próprias.
   chaves de teste, duas contas fizeram login e a API preservou identidades,
   tarefas e isolamento. O backup levou cerca de 120 s e a recuperação
   bem-sucedida, 118 s. Repita a recuperação no staging antes dos convites.
-- A auditoria com `npm audit --omit=dev` identificou 70 entradas na árvore
-  de produção (39 moderadas, 28 altas e 3 críticas). As críticas afetam
-  Next.js, `proxy-addr` e `tar`. O npm indicou atualização de versão
-  principal do Next.js. Revise a compatibilidade com React e com o router,
-  reexecute o fluxo autenticado e a auditoria após atualizar. Avalie os
-  transitivos pela dependência que os inclui antes de convidar pessoas.
+- A auditoria do candidato com `npm audit --omit=dev` encontrou 67 entradas na árvore
+  de produção (39 moderadas, 27 altas e 1 crítica). A atualização de
+  `proxy-addr` para 2.0.8 e do bcrypt para 6.0.0 removeu dois alertas críticos.
+  O bcrypt 6 validou um hash gerado pela versão 5 em contêiner Linux. A
+  auditoria do NexusAuth isolado encontrou zero críticos, 11 altos e 4 moderados.
+  O Next.js é o alerta crítico restante. A migração exige validação de React,
+  autenticação, calendário, build e lint. Resolva esse alerta e avalie os altos
+  aplicáveis antes da beta. Consulte o [guia de migração do Next.js](https://nextjs.org/docs/app/guides/upgrading/version-16).
 
 ## Primeira sessão da beta
 

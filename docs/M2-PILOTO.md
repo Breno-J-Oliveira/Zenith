@@ -69,6 +69,19 @@ e use `docker compose @composeArgs stop`. A retomada usa o mesmo projeto,
 o mesmo arquivo de ambiente e o mesmo SQLite. Preserve os volumes do Compose
 para manter contas, sessões e chaves do piloto.
 
+## Verificação de persistência
+
+O candidato `c81ee7e` foi preparado para um piloto local dedicado. O SQLite foi
+criado do zero com as quatro migrações e passou no `integrity_check`. Após
+reiniciar PostgreSQL, Redis, NexusAuth e a API Zenith, duas contas fictícias
+voltaram a entrar. A tarefa concluída permaneceu visível em Hoje no Chrome e
+uma tentativa de leitura com a outra conta recebeu 404. A captura repetida
+usou um único ID.
+
+Para o diário pessoal, use identificadores neutros e mantenha os registros no
+dispositivo. A verificação técnica permite iniciar a linha de base. Os 14 dias
+serão medidos durante o uso real.
+
 ## Registro diário
 
 Antes do piloto, observe o método atual por três dias. Durante 14 dias,
