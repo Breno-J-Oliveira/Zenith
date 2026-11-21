@@ -1,147 +1,111 @@
 'use client';
 
-import { useRef, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import { apiGet, apiPatch } from '@/lib/api';
+import ptBr from '@fullcalendar/core/locales/pt-br';
+import type { EventDropArg } from '@fullcalendar/core';
+import { apiPatch, apiPut } from '@/lib/api';
 import { addCivilDays, getCivilDate, getCivilTime, ZENITH_TIME_ZONE } from '../../../../packages/shared/src/civil-date';
+import { loadCalendarEvents, type CalendarEvent } from './events';
 
-interface CalendarEvent {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  type: 'task' | 'appointment' | 'routine';
-  sourceId: string;
-  done?: boolean;
-}
-
-interface CalendarViewProps {
-  onReorgMessage?: (message: string) => void;
-}
-
-const eventColors: Record<string, string> = {
-  task: 'var(--color-primary)',
-  routine: 'var(--color-text-dim)',
-  appointment: '#8b5cf6',
+const eventColors: Record<CalendarEvent['type'], string> = {
+  task: 'var(--color-primary)', routine: 'var(--color-text-muted)', appointment: '#7254b8',
 };
 
-function getCalendarNow(): string {
+function getCalendarNow() {
   const instant = new Date();
   return `${getCivilDate(instant)}T${getCivilTime(instant)}:00`;
 }
 
-export function CalendarView({ onReorgMessage }: CalendarViewProps) {
-  const calendarRef = useRef<FullCalendar>(null);
+export function CalendarView({ date, onSelectDate, onMessage }: {
+  date: string;
+  onSelectDate: (date: string) => void;
+  onMessage: (message: string) => void;
+}) {
+  const [range, setRange] = useState<{ from: string; to: string }>();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [attempt, setAttempt] = useState(0);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [saving, setSaving] = useState(false);
 
-  const fetchEvents = useCallback(async (start: string, end: string) => {
+  useEffect(() => {
+    if (!range) return;
+    const controller = new AbortController();
+    setLoadState('loading');
+    loadCalendarEvents(range.from, range.to, controller.signal)
+      .then(items => {
+        if (controller.signal.aborted) return;
+        setEvents(items);
+        setLoadState('ready');
+      })
+      .catch(() => { if (!controller.signal.aborted) setLoadState('error'); });
+    return () => controller.abort();
+  }, [range, attempt]);
+
+  async function move({ event, revert }: EventDropArg) {
+    if (saving) { revert(); return; }
+    setSaving(true);
     try {
-      const from = start.split('T')[0];
-      // FullCalendar usa fim exclusivo e a API usa datas inclusivas.
-      const to = addCivilDays(end.split('T')[0], -1);
-      const data = await apiGet<any[]>(`/calendar?from=${from}&to=${to}`);
-      setEvents(data);
-    } catch {
-      setEvents([]);
-    }
-  }, []);
-
-  const handleDatesChange = useCallback((info: { startStr: string; endStr: string }) => {
-    fetchEvents(info.startStr, info.endStr);
-  }, [fetchEvents]);
-
-  const handleEventDrop = useCallback(async (info: any) => {
-    const event = info.event;
-    const eventId = event.id;
-    const type = eventId.startsWith('cal-rtask-') ? 'task' :
-                 eventId.startsWith('cal-task-') ? 'task' :
-                 eventId.startsWith('cal-appt-') ? 'appointment' : 'task';
-
-    const newStart = event.startStr;
-    const newEnd = event.endStr || undefined;
-
-    try {
-      const data = await apiPatch<any>('/calendar/reschedule', { eventId, type, newStart, newEnd });
-
-      if (data.moved && data.moved.length > 0 && onReorgMessage) {
-        onReorgMessage(data.message);
+      const { sourceId, type } = event.extendedProps;
+      if (type === 'task') {
+        await apiPut(`/tasks/${sourceId}`, { date: event.startStr.slice(0, 10) });
+        onMessage('Data da tarefa atualizada.');
+      } else {
+        const result = await apiPatch<{ message: string }>('/calendar/reschedule', {
+          eventId: event.id, type: 'task', newStart: event.startStr, newEnd: event.endStr || undefined,
+        });
+        onMessage(result.message);
       }
-
-      // Refresh events
-      const calendar = calendarRef.current;
-      if (calendar) {
-        const api = calendar.getApi();
-        fetchEvents(api.formatIso(api.view.activeStart, true), api.formatIso(api.view.activeEnd, true));
-      }
+      setAttempt(previous => previous + 1);
     } catch {
-      info.revert();
+      revert();
+      onMessage('Não foi possível mover o item. Confira se a data foi salva antes de tentar novamente.');
+    } finally {
+      setSaving(false);
     }
-  }, [fetchEvents, onReorgMessage]);
-
-  const calendarEvents = events.map(e => ({
-    id: e.id,
-    title: e.done ? `✓ ${e.title}` : e.title,
-    start: e.start,
-    end: e.end,
-    backgroundColor: e.done ? 'var(--color-surface-2)' : eventColors[e.type],
-    borderColor: e.done ? 'var(--color-surface-2)' : eventColors[e.type],
-    textColor: e.done ? 'var(--color-text-dim)' : '#fff',
-    editable: e.type !== 'appointment',
-    extendedProps: { type: e.type, sourceId: e.sourceId, done: e.done },
-  }));
+  }
 
   return (
-    <div className="card p-4">
+    <div className="card min-w-0 p-3 sm:p-4">
+      {loadState === 'error' && <div className="mb-3 flex flex-wrap items-center gap-2">
+        <p role="alert">Não foi possível carregar a grade.</p>
+        <button className="btn btn-secondary min-h-11" type="button" onClick={() => setAttempt(previous => previous + 1)}>Tentar novamente</button>
+      </div>}
+      {loadState === 'loading' && <p role="status" className="mb-3 text-sm text-[var(--color-text-secondary)]">Carregando grade…</p>}
       <style>{`
-        .fc { color: var(--color-text); }
-        .fc .fc-toolbar-title { font-family: var(--font-orbitron); font-size: 1.1rem; }
-        .fc .fc-button {
-          background: var(--color-surface-2);
-          border: 1px solid var(--border-default);
-          color: var(--color-text-dim);
-          font-family: var(--font-mono);
-          font-size: 0.75rem;
-          transition: all var(--transition-fast);
-        }
-        .fc .fc-button:hover { color: var(--color-primary); border-color: var(--color-primary); box-shadow: var(--glow-subtle); }
-        .fc .fc-button-active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; box-shadow: var(--glow-sm); }
-        .fc .fc-col-header-cell-cushion { color: var(--color-text-dim); font-family: var(--font-mono); font-size: 0.7rem; }
-        .fc .fc-daygrid-day-number, .fc .fc-timegrid-slot-label-cushion { color: var(--color-text); font-family: var(--font-mono); font-size: 0.8rem; }
-        .fc .fc-day-today { background: var(--color-surface-2) !important; }
-        .fc .fc-event { cursor: pointer; border-radius: var(--radius-sm); padding: 1px 4px; font-size: 0.75rem; transition: all var(--transition-fast); }
-        .fc .fc-event:hover { box-shadow: var(--glow-sm); }
-        .fc .fc-timegrid-slot { border-color: var(--border-subtle); }
-        .fc .fc-scrollgrid, .fc .fc-scrollgrid-section > * { border-color: var(--border-default); }
-        .fc .fc-col-header-cell, .fc .fc-daygrid-day { border-color: var(--border-default); }
-        .fc-theme-standard td, .fc-theme-standard th { border-color: var(--border-default); }
+        .zenith-calendar .fc-toolbar { flex-wrap: wrap; gap: .75rem; }
+        .zenith-calendar .fc-toolbar-title { font-family: var(--font-orbitron); font-size: 1rem; }
+        .zenith-calendar .fc-button-primary { background: var(--color-surface-2); border-color: var(--border-default); color: var(--color-text); min-height: 2.75rem; }
+        .zenith-calendar .fc-button-primary:not(:disabled).fc-button-active { background: var(--color-surface-3); border-color: var(--color-primary); }
+        .zenith-calendar .fc-day-today { background: var(--color-primary-subtle) !important; }
+        .zenith-calendar .fc-theme-standard td, .zenith-calendar .fc-theme-standard th,
+        .zenith-calendar .fc-theme-standard .fc-scrollgrid { border-color: var(--border-default); }
+        .zenith-calendar .fc-event { cursor: pointer; border-radius: .25rem; }
       `}</style>
-      <FullCalendar
-        ref={calendarRef}
-        plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        timeZone={ZENITH_TIME_ZONE}
-        now={getCalendarNow}
-        initialView="timeGridWeek"
-        headerToolbar={{
-          left: 'prev,next today',
-          center: 'title',
-          right: 'dayGridMonth,timeGridWeek,timeGridDay',
-        }}
-        locale="pt-br"
-        height="auto"
-        slotMinTime="06:00:00"
-        slotMaxTime="23:00:00"
-        nowIndicator
-        editable
-        droppable
-        eventResizableFromStart
-        events={calendarEvents}
-        datesSet={handleDatesChange}
-        eventDrop={handleEventDrop}
-        eventResize={handleEventDrop}
-      />
+      <div className="zenith-calendar min-w-0">
+        <FullCalendar plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]} locale={ptBr}
+          timeZone={ZENITH_TIME_ZONE} now={getCalendarNow} initialDate={date} initialView="dayGridMonth"
+          headerToolbar={{ left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay' }}
+          height="auto" slotMinTime="00:00:00" slotMaxTime="24:00:00" nowIndicator dayMaxEvents={3}
+          editable={!saving && loadState === 'ready'} eventDurationEditable={false} eventDrop={move}
+          dateClick={event => onSelectDate(event.dateStr.slice(0, 10))}
+          eventClick={({ event }) => onSelectDate(event.startStr.slice(0, 10))}
+          datesSet={({ startStr, endStr }) => {
+            const from = startStr.slice(0, 10);
+            const to = addCivilDays(endStr.slice(0, 10), -1);
+            setRange(current => current?.from === from && current.to === to ? current : { from, to });
+          }}
+          events={loadState === 'ready' ? events.map(event => ({
+            id: event.id, title: event.done ? `✓ ${event.title}` : event.title, start: event.start, end: event.end,
+            allDay: event.type === 'task', startEditable: event.type !== 'appointment' && !saving, durationEditable: false,
+            backgroundColor: event.done ? 'var(--color-surface-3)' : eventColors[event.type],
+            borderColor: event.done ? 'var(--color-surface-3)' : eventColors[event.type],
+            extendedProps: { type: event.type, sourceId: event.sourceId },
+          })) : []} />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { createHash } from 'node:crypto';
 import { RoutinesService } from '../routines/routines.service';
 import { ConflictResolver } from '../shared/conflict-resolver.service';
 import { PrismaService } from '../prisma.service';
@@ -15,15 +17,56 @@ export class SchedulerService {
     private readonly prisma: PrismaService,
   ) {}
 
+  private appointmentFields(dto: CreateAppointmentDTO) {
+    const title = typeof dto?.title === 'string' ? dto.title.trim() : '';
+    const { date, startTime, endTime } = dto ?? {};
+    const civil = /^\d{4}-\d{2}-\d{2}$/;
+    const time = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+    const day = typeof date === 'string' && civil.test(date) ? new Date(date + 'T00:00:00Z') : null;
+    if (!title || title.length > 200) throw new BadRequestException('Informe um título de até 200 caracteres.');
+    if (!day || !Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== date) {
+      throw new BadRequestException('Informe uma data válida.');
+    }
+    if (typeof startTime !== 'string' || typeof endTime !== 'string' ||
+        !time.test(startTime) || !time.test(endTime) || endTime <= startTime) {
+      throw new BadRequestException('O fim deve ser após o início no mesmo dia.');
+    }
+    return { title, date, startTime, endTime };
+  }
+
+  async createManualAppointment(userId: string, dto: CreateAppointmentDTO & { requestId: string }): Promise<Appointment> {
+    const fields = this.appointmentFields(dto);
+    const requestId = dto.requestId;
+    if (typeof requestId !== 'string' || !/^[\da-f]{8}(?:-[\da-f]{4}){3}-[\da-f]{12}$/i.test(requestId)) {
+      throw new BadRequestException('Identificador de criação inválido.');
+    }
+    const id = 'manual-' + createHash('sha256').update(JSON.stringify([userId, requestId.toLowerCase()])).digest('hex');
+    try {
+      const record = await this.prisma.appointment.create({ data: { id, userId, ...fields } });
+      return this.toAppointment(record);
+    } catch (error) {
+      if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') throw error;
+      const existing = await this.prisma.appointment.findFirst({ where: { id, userId } });
+      if (!existing) throw error;
+      return this.toAppointment(existing);
+    }
+  }
+
+  async updateAppointment(userId: string, id: string, dto: CreateAppointmentDTO): Promise<Appointment> {
+    const data = this.appointmentFields(dto);
+    try {
+      return this.toAppointment(await this.prisma.appointment.update({ where: { id, userId }, data }));
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        throw new NotFoundException('Compromisso não encontrado.');
+      }
+      throw error;
+    }
+  }
+
   async createAppointment(userId: string, dto: CreateAppointmentDTO): Promise<ReorganizationResult> {
     const appointment = await this.prisma.appointment.create({
-      data: {
-        userId,
-        title: dto.title,
-        date: dto.date,
-        startTime: dto.startTime,
-        endTime: dto.endTime,
-      },
+      data: { userId, ...this.appointmentFields(dto) },
     });
 
     return this.reorganizeDay(userId, this.toAppointment(appointment));
