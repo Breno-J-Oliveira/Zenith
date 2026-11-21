@@ -163,10 +163,10 @@ function RoutineContent() {
         </fieldset>
         {formError && <p role="alert" className="text-sm text-[var(--color-text-secondary)]">{formError}</p>}
         <div className="flex flex-wrap gap-2">
-          <button type="submit" className="btn btn-primary min-h-11" disabled={saving || loadState !== 'ready' || !draft.title.trim()}>
+          <button type="submit" className="btn btn-primary min-h-11 disabled:opacity-50" disabled={saving || loadState !== 'ready' || !draft.title.trim()}>
             {saving ? 'Salvando…' : editing ? 'Salvar alterações' : 'Criar rotina'}
           </button>
-          <button type="button" className="btn btn-ghost min-h-11" disabled={saving} onClick={closeForm}>Cancelar</button>
+          <button type="button" className="btn btn-ghost min-h-11 disabled:opacity-50" disabled={saving} onClick={closeForm}>Cancelar</button>
         </div>
       </form>
     );
@@ -180,7 +180,7 @@ function RoutineContent() {
             <h1 className="font-orbitron text-2xl font-bold tracking-tight sm:text-3xl">Rotinas</h1>
             <p className="mt-2 text-[var(--color-text-secondary)]">Defina o ritmo dos seus hábitos e gere as tarefas dos próximos sete dias, a partir de hoje.</p>
           </div>
-          <button ref={addButton} type="button" className="btn btn-primary min-h-11" onClick={() => showForm()} disabled={saving || loadState !== 'ready'}>
+          <button ref={addButton} type="button" className="btn btn-primary min-h-11 disabled:opacity-50" onClick={() => showForm()} disabled={saving || loadState !== 'ready'}>
             <Plus size={18} aria-hidden="true" /> Nova rotina
           </button>
         </header>
@@ -218,7 +218,7 @@ function RoutineContent() {
                       <span className="inline-flex items-center gap-1.5"><Clock size={15} aria-hidden="true" /> {routine.time} · {routine.duration} min</span>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      <button type="button" className="btn btn-primary min-h-11" disabled={busy || !routine.active}
+                      <button type="button" className="btn btn-primary min-h-11 disabled:opacity-50" disabled={busy || !routine.active}
                         onClick={() => void runAction(routine.id, 'Gerando…', async () => {
                           setGenerated(current => ({ ...current, [routine.id]: undefined }));
                           const tasks = await apiPost<Task[]>(`/routines/${routine.id}/generate-tasks?days=7`);
@@ -226,13 +226,13 @@ function RoutineContent() {
                         }, 'A geração não terminou. Você pode tentar de novo sem duplicar as tarefas.')}>
                         <CalendarDays size={16} aria-hidden="true" /> {actions[routine.id] === 'Gerando…' ? 'Gerando…' : 'Gerar para 7 dias'}
                       </button>
-                      <button type="button" className="btn btn-secondary min-h-11" disabled={busy}
+                      <button type="button" className="btn btn-secondary min-h-11 disabled:opacity-50" disabled={busy}
                         onClick={() => void runAction(routine.id, 'Atualizando…', async () => {
                           replaceRoutine(await apiPatch<Routine>(`/routines/${routine.id}`, { active: !routine.active }));
                         }, 'Não foi possível alterar a situação da rotina.')}>
                         {routine.active ? 'Pausar' : 'Retomar'}
                       </button>
-                      <button ref={editing === routine.id ? editButton : undefined} type="button" className="btn btn-ghost min-h-11" disabled={busy}
+                      <button ref={editing === routine.id ? editButton : undefined} type="button" className="btn btn-ghost min-h-11 disabled:opacity-50" disabled={busy}
                         onClick={() => showForm(routine)}>
                         <Pencil size={16} aria-hidden="true" /> Editar
                       </button>
