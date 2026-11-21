@@ -19,13 +19,10 @@ const nextConfig = {
   },
 
   // ─── Nota sobre Middleware ────────────────────────────────────────────
-  // Com output: 'export', o middleware.ts (Edge runtime) NÃO é executado.
+  // Com output: 'export', o proxy.ts NÃO é executado.
   // A proteção de rotas passa a ser 100% client-side via AuthProvider.
   // Isso é aceitável: o AuthProvider já faz a validação real do token.
 
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
 }
 
 module.exports = nextConfig
