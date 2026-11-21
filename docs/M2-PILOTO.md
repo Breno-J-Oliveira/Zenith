@@ -39,6 +39,36 @@ somente depois de confirmar o isolamento e escolher o ambiente para o piloto.
   para retomar o fluxo. A revisão usa as datas planejadas dos últimos sete
   dias e mostra o estado atual das tarefas.
 
+## Ambiente do piloto local
+
+Use um projeto Compose separado com volumes persistentes. O perfil descartável
+do M1 recria o PostgreSQL quando ele reinicia. No piloto, use a mesma conta
+durante os 14 dias e mantenha dados e backups fora do Git.
+
+No passo 2 do [roteiro do M1](M1-AMBIENTE-LOCAL.md), use
+`.env.zenith-pilot.local` para `$fixtureFile` e troque os argumentos do Compose
+antes de iniciar a API de autenticação.
+
+```powershell
+$composeArgs = @('-p', 'zenith-pilot', '--env-file', $fixtureFile, '-f', 'docker-compose.yml', '-f', 'compose.zenith-pilot.yml')
+docker compose @composeArgs config --quiet
+docker compose @composeArgs up -d api --wait --wait-timeout 180
+```
+
+No passo 3, use um SQLite exclusivo em um caminho absoluto local
+(`file:C:/caminho-do-piloto/zenith-pilot.sqlite`). Se precisar usar a alternativa
+Linux para migrar o SQLite, mova a base recém-criada para o caminho definitivo.
+Configure `NEXUS_AUTH_URL=http://localhost:3120` e `PORT=3122` na API.
+Na web, use `NEXT_PUBLIC_NEXUS_AUTH_URL=http://localhost:3120`,
+`NEXT_PUBLIC_API_URL=http://localhost:3122` e passe `--port 3121` para o Next.
+
+Abra [Hoje](http://localhost:3121/hoje/) e use o cadastro local. A web e as
+duas APIs escutam no próprio computador. A confirmação de e-mail fica
+desativada neste perfil local. Para pausar e liberar memória, encerre web e API
+e use `docker compose @composeArgs stop`. A retomada usa o mesmo projeto,
+o mesmo arquivo de ambiente e o mesmo SQLite. Preserve os volumes do Compose
+para manter contas, sessões e chaves do piloto.
+
 ## Registro diário
 
 Antes do piloto, observe o método atual por três dias. Durante 14 dias,

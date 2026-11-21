@@ -1,0 +1,18 @@
+# Perfil do piloto local. Os volumes do projeto Compose guardam dados e chaves.
+services:
+  postgres:
+    container_name: !reset null
+    restart: "no"
+  redis:
+    container_name: !reset null
+    restart: "no"
+  api:
+    container_name: !reset null
+    restart: "no"
+    ports: !override
+      - "127.0.0.1:3120:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      REQUIRE_EMAIL_VERIFIED: "false"
+      CORS_ORIGINS: http://localhost:3121
