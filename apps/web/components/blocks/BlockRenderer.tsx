@@ -1,6 +1,6 @@
 'use client';
 
-import { ListTodo, Target } from 'lucide-react';
+import { ListTodo, Target, Trash2 } from 'lucide-react';
 import { type FormEvent, useId, useRef, useState } from 'react';
 
 interface BlockData {
@@ -35,14 +35,14 @@ export function BlockRenderer({ block, onUpdate, onDelete }: BlockRendererProps)
   }
 }
 
-function BlockWrapper({ children, onDelete, onDragStart }: { children: React.ReactNode; onDelete: () => void; onDragStart?: (e: React.DragEvent) => void }) {
+function BlockWrapper({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
   return (
     <div className="group flex items-start gap-2 py-1">
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mt-1">
-        <span className="cursor-grab text-dim text-xs" draggable onDragStart={onDragStart}>⠿</span>
-        <button onClick={onDelete} className="text-dim hover:text-red-400 text-xs">✕</button>
-      </div>
-      <div className="flex-1">{children}</div>
+      <div className="min-w-0 flex-1">{children}</div>
+      <button type="button" onClick={onDelete} aria-label="Excluir bloco"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded text-dim hover:text-red-400 focus-visible:outline">
+        <Trash2 aria-hidden="true" size={16} />
+      </button>
     </div>
   );
 }

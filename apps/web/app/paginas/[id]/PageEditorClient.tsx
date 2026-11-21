@@ -1,6 +1,6 @@
 'use client';
 
-import { AlignLeft, Heading, ImageIcon, ListTodo, Minus, SquareCheck, Target } from 'lucide-react';
+import { AlignLeft, GripVertical, Heading, ImageIcon, ListTodo, Minus, SquareCheck, Target } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { ShellLayout } from '../../../components/layout/ShellLayout';
 import { BlockRenderer } from '../../../components/blocks/BlockRenderer';
@@ -207,6 +207,7 @@ function SortableBlock({ block, onUpdate, onDelete }: {
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -219,16 +220,19 @@ function SortableBlock({ block, onUpdate, onDelete }: {
   };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div ref={setNodeRef} style={style}>
       <div className="relative">
-        <div
+        <button
+          ref={setActivatorNodeRef}
+          type="button"
+          {...attributes}
           {...listeners}
-          className="absolute left-0 top-1 cursor-grab active:cursor-grabbing opacity-0 hover:opacity-100 text-dim text-xs px-1"
-          title="Arraste para reordenar"
+          className="absolute left-0 top-1 grid h-10 w-10 touch-none place-items-center rounded cursor-grab text-dim active:cursor-grabbing focus-visible:outline"
+          aria-label="Reordenar bloco"
         >
-          ⠿
-        </div>
-        <div className="pl-6">
+          <GripVertical aria-hidden="true" size={16} />
+        </button>
+        <div className="pl-10">
           <BlockRenderer block={block} onUpdate={onUpdate} onDelete={onDelete} />
         </div>
       </div>
