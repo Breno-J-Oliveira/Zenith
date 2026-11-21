@@ -1,0 +1,18 @@
+# Extensão exclusiva da jornada descartável no GitHub Actions.
+services:
+  api:
+    depends_on:
+      mailpit:
+        condition: service_started
+    environment:
+      REQUIRE_EMAIL_VERIFIED: "true"
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_FROM: zenith@example.com
+      ACCOUNT_LINK_ORIGIN: http://localhost:3101
+  mailpit:
+    image: axllent/mailpit:v1.34.0
+    ports:
+      - "127.0.0.1:8025:8025"
+    networks:
+      - nexus-net

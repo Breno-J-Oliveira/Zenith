@@ -55,6 +55,24 @@ verificações em staging têm registros próprios.
   o schema atual. Se houver dano nos dados, preserve o estado para diagnóstico
   e ensaie o retorno a um backup isolado antes de trocar a base em uso.
 
+## Entrega de links de conta
+
+- Configure `ACCOUNT_LINK_ORIGIN` com a origem HTTPS exata da web, sem barra
+  final. No NexusAuth, defina `SMTP_HOST`, `SMTP_PORT`, `SMTP_FROM` e, quando
+  exigidos pelo servidor, `SMTP_USER` e `SMTP_PASS`. Use TLS direto na porta 465
+  ou servidor com STARTTLS. Confirme que `REQUIRE_EMAIL_VERIFIED=true`.
+- O cadastro web aguarda a confirmação do endereço. O usuário pode solicitar
+  outro link no login, inclusive após falha de entrega. O transporte registra
+  a categoria da falha sem incluir destinatário ou token. A fila em memória
+  é limitada e pode perder envios se o processo parar. Reenvio e recuperação
+  são as rotas para pedir um novo link nessas condições.
+- A redefinição revoga as sessões e os refresh tokens no NexusAuth. Um JWT
+  já emitido pode ser aceito até expirar em serviços que validam apenas sua
+  assinatura. Verifique o comportamento ponta a ponta no staging.
+- O CI usa um coletor SMTP descartável. A entrega em caixas reais, as
+  configurações de remetente e o fluxo CAPTCHA de produção exigem validação
+  no staging. Confirme também os links de login social antes dos convites.
+
 ## Evidência local
 
 - A checagem de CORS passou via HTTP. A origem permitida recebeu o cabeçalho
@@ -80,9 +98,8 @@ verificações em staging têm registros próprios.
   registrou zero críticos, 9 altos e 4 moderados.
 - Rode `npm audit --omit=dev` no workspace e na raiz isolada do NexusAuth
   antes de liberar uma versão. Avalie os alertas restantes conforme os
-  caminhos usados em produção. O NexusAuth gera os tokens de verificação e
-  recuperação. A entrega desses links por e-mail ainda precisa ser
-  implementada e validada no staging antes dos convites.
+  caminhos usados em produção. Antes dos convites, faça os mesmos fluxos
+  de e-mail com o domínio, remetente e CAPTCHA do staging.
 
 ## Primeira sessão da beta
 

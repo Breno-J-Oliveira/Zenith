@@ -12,7 +12,7 @@
  *   GET  /auth/me                                          → { id, email, name, role }
  *   POST /auth/verify-email    { token }                  → 200
  *   POST /auth/forgot-password { email }                  → 200
- *   POST /auth/reset-password  { token, password }        → 200
+ *   POST /auth/reset-password  { token, newPassword }        → 200
  *   POST /auth/magic-link      { email }                  → 200
  *   POST /auth/magic-link/verify { token }                → { accessToken, refreshToken }
  *   POST /auth/change-password { currentPassword, newPassword } → 200
@@ -128,7 +128,7 @@ export class NexusAuthClient {
   }
 
   async resetPassword(token: string, password: string): Promise<void> {
-    await this.request('POST', '/auth/reset-password', { token, password });
+    await this.request('POST', '/auth/reset-password', { token, newPassword: password });
   }
 
   async requestMagicLink(email: string): Promise<void> {

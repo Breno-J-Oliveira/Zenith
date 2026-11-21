@@ -20,11 +20,102 @@ async function request(url, { body, token, expected = 200 } = {}) {
   return response.json();
 }
 
-async function register(name) {
+function fixtureCredentials() {
   const suffix = randomUUID();
-  const credentials = { email: `zenith-${suffix}@example.com`, password: `Fixture!9a${suffix}` };
+  return {
+    email: `zenith-${suffix}@example.com`,
+    password: `Fixture!9A${suffix.replace(/abcd|1234|(.)\1{3,}/gi, '-q-')}`,
+  };
+}
+
+async function mailLink(email, kind, previousMessageId) {
+  const expectedPath = kind === 'reset' ? '/reset-password/' : '/verify-email/';
+  const subject = kind === 'reset' ? 'Redefina sua senha no Zenith' : 'Confirme seu e-mail no Zenith';
+  const mailbox = 'http://127.0.0.1:8025/api/v1';
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    const { messages } = await request(mailbox + '/messages');
+    const match = messages.find(message => message.ID !== previousMessageId &&
+      message.Subject === subject && message.To.some(to => to.Address === email));
+    if (match) {
+      const message = await request(mailbox + '/message/' + match.ID);
+      const link = message.Text.match(/https?:\/\/[^\s]+/)?.[0];
+      assert.ok(link, 'A mensagem deve conter um link');
+      const url = new URL(link);
+      assert.equal(url.origin, web);
+      assert.equal(url.pathname, expectedPath);
+      assert.match(url.hash, /^#[a-f0-9-]{36}$/i);
+      return { url, id: match.ID };
+    }
+    await new Promise(resolve => setTimeout(resolve, 300));
+  }
+  throw new Error(`O e-mail de ${kind} não chegou à caixa de teste`);
+}
+
+async function confirmedFixture(name) {
+  const credentials = fixtureCredentials();
   await request(auth + '/auth/register', { body: { ...credentials, name }, expected: 201 });
+  const { url } = await mailLink(credentials.email, 'verification');
+  await request(auth + '/auth/verify-email', { body: { token: url.hash.slice(1) } });
   return credentials;
+}
+
+async function registerFromBrowser(page, credentials) {
+  await page.goto(web + '/register/');
+  await page.getByLabel('Nome', { exact: true }).fill('Zenith Fixture A');
+  await page.getByLabel('E-mail', { exact: true }).fill(credentials.email);
+  await page.getByLabel('Senha', { exact: true }).fill(credentials.password);
+  await page.getByLabel('Confirmar senha', { exact: true }).fill(credentials.password);
+  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  await page.getByRole('heading', { name: 'Confira seu e-mail' }).waitFor();
+
+  const first = await mailLink(credentials.email, 'verification');
+  await page.getByRole('link', { name: 'Reenviar confirmação', exact: true }).click();
+  await page.getByLabel('E-mail', { exact: true }).fill(credentials.email);
+  await page.getByRole('button', { name: 'Solicitar link', exact: true }).click();
+  await page.getByText('Se o endereço estiver elegível', { exact: false }).waitFor();
+  const resent = await mailLink(credentials.email, 'verification', first.id);
+  assert.equal(first.url.hash === resent.url.hash, false);
+
+  await page.goto(resent.url.href);
+  const confirmation = page.getByRole('button', { name: 'Confirmar e-mail', exact: true });
+  await confirmation.waitFor();
+  assert.equal(new URL(page.url()).hash, '');
+  await request(auth + '/auth/login', { body: credentials, expected: 401 });
+  await confirmation.click();
+  await page.getByText('E-mail confirmado. Sua conta está pronta para entrar.').waitFor();
+  await request(auth + '/auth/verify-email', { body: { token: first.url.hash.slice(1) }, expected: 400 });
+  const generic = await request(auth + '/auth/resend-verification', { body: { email: 'missing@example.com' }, expected: 202 });
+  const verified = await request(auth + '/auth/resend-verification', { body: { email: credentials.email }, expected: 202 });
+  assert.deepEqual(verified, generic);
+}
+
+async function verifyPasswordRecovery(page, owner) {
+  const original = await request(auth + '/auth/login', { body: owner });
+  await page.goto(web + '/forgot-password/');
+  await page.getByLabel('E-mail', { exact: true }).fill(owner.email);
+  await page.getByRole('button', { name: 'Solicitar link', exact: true }).click();
+  await page.getByText('Se o endereço estiver elegível', { exact: false }).waitFor();
+  const { url } = await mailLink(owner.email, 'reset');
+  await page.goto(url.href);
+  const password = page.getByLabel('Nova senha', { exact: true });
+  const confirmation = page.getByLabel('Confirmar nova senha', { exact: true });
+  const save = page.getByRole('button', { name: 'Salvar nova senha', exact: true });
+  await password.fill(owner.password);
+  await confirmation.fill(owner.password);
+  await save.click();
+  await page.getByText('Escolha uma senha diferente das últimas que você usou.').waitFor();
+  const newPassword = owner.password + '!Nova8';
+  await password.fill(newPassword);
+  await confirmation.fill(newPassword);
+  await save.click();
+  await page.getByText('Senha alterada. Entre com sua nova senha.').waitFor();
+  await request(auth + '/auth/refresh', { body: { refreshToken: original.refreshToken }, expected: 401 });
+  await request(auth + '/auth/reset-password', { body: { token: url.hash.slice(1), newPassword }, expected: 400 });
+  await request(auth + '/auth/login', { body: owner, expected: 401 });
+  await page.getByRole('link', { name: 'Entrar no Zenith', exact: true }).click();
+  await signIn(page, { ...owner, password: newPassword });
+  await page.waitForURL(url => url.pathname === '/dashboard/');
 }
 
 async function signIn(page, credentials) {
@@ -37,8 +128,8 @@ async function signIn(page, credentials) {
 }
 
 async function verify() {
-  const owner = await register('Zenith Fixture A');
-  const visitor = await register('Zenith Fixture B');
+  const owner = fixtureCredentials();
+  const visitor = await confirmedFixture('Zenith Fixture B');
   const { accessToken: visitorToken } = await request(auth + '/auth/login', { body: visitor });
   assert.ok(visitorToken, 'A segunda conta deve receber um access token');
 
@@ -53,6 +144,7 @@ async function verify() {
     });
     page.setDefaultTimeout(15_000);
 
+    await registerFromBrowser(page, owner);
     const today = '/hoje/?new=true';
     await page.goto(web + today);
     await page.waitForURL(url => url.pathname === '/login/');
@@ -179,6 +271,8 @@ async function verify() {
     assert.equal((await context.cookies()).some(cookie => cookie.name === 'zenith_refresh'), false);
     await page.goto(web + '/hoje/');
     await page.waitForURL(url => url.pathname === '/login/');
+    await verifyPasswordRecovery(page, owner);
+    console.log('Cadastro com confirmação, reenvio e recuperação de senha validados pelo SMTP de teste.');
     console.log('Jornada móvel validada: recarga com sessão, rotação, logout e rotina com isolamento.');
   } finally {
     await browser.close();
@@ -186,6 +280,6 @@ async function verify() {
 }
 
 verify().catch(error => {
-  console.error(error);
+  console.error(String(error.stack || error).replace(/#[a-f0-9-]{36}/gi, '#[token omitido]'));
   process.exitCode = 1;
 });

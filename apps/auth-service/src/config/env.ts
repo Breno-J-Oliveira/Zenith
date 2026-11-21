@@ -19,10 +19,11 @@ const envSchema = z.object({
   CORS_ORIGINS: z.string().default(''),
 
   SMTP_HOST: z.string().optional(),
-  SMTP_PORT: z.coerce.number().optional(),
+  SMTP_PORT: z.coerce.number().int().min(0).max(65535).optional(),
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
+  ACCOUNT_LINK_ORIGIN: z.string().optional(),
 
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
@@ -63,6 +64,17 @@ export function validateEnv(config: Record<string, unknown>) {
   }
 
   const data = parsed.data;
+  if (data.SMTP_HOST) {
+    if (!z.string().email().safeParse(data.SMTP_FROM).success || !data.ACCOUNT_LINK_ORIGIN) {
+      throw new Error('Configure SMTP_FROM e ACCOUNT_LINK_ORIGIN para o envio de links de conta.');
+    }
+    const origin = new URL(data.ACCOUNT_LINK_ORIGIN);
+    const local = origin.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(origin.hostname);
+    if (origin.origin !== data.ACCOUNT_LINK_ORIGIN ||
+        (origin.protocol !== 'https:' && !(data.NODE_ENV !== 'production' && local))) {
+      throw new Error('ACCOUNT_LINK_ORIGIN deve ser uma origem HTTPS sem barra final, ou HTTP local em desenvolvimento.');
+    }
+  }
 
   // SECURITY: Critical validation - ENCRYPTION_KEY must be set in production
   if (data.NODE_ENV === 'production' && !data.ENCRYPTION_KEY) {

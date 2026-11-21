@@ -17,6 +17,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -58,8 +59,9 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       await register(email, password, name);
-      // Se o registro retornar sem erro, redireciona para login
-      router.push('/login?registered=true');
+      setPassword('');
+      setConfirmPassword('');
+      setSubmitted(true);
     } catch (err) {
       const msg = (err as Error).message || 'Erro ao registar';
       // Traduzir erros comuns do NexusAuth
@@ -74,6 +76,20 @@ export default function RegisterPage() {
       setSubmitting(false);
     }
   };
+
+  if (submitted) {
+    return (
+      <div className="grid min-h-screen place-items-center px-4 py-12">
+        <main className="card hud-border w-full max-w-md space-y-4 p-6 sm:p-8">
+          <ZenithMark className="h-10 w-10 text-[var(--color-primary)]" />
+          <h1 className="font-orbitron text-xl font-bold">Confira seu e-mail</h1>
+          <p role="status">Se o endereço estiver elegível, você receberá o link de confirmação. Confira também a pasta de spam.</p>
+          <Link href="/resend-verification/" className="btn btn-secondary min-h-11 w-full">Reenviar confirmação</Link>
+          <Link href="/login/" className="btn btn-primary min-h-11 w-full">Voltar ao login</Link>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] px-4 py-12 relative overflow-hidden">
@@ -110,11 +126,12 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">
-                NOME
+              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2" htmlFor="register-name">
+                Nome
               </label>
               <input
                 type="text"
+                id="register-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="O teu nome"
@@ -127,11 +144,12 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">
-                EMAIL
+              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2" htmlFor="register-email">
+                E-mail
               </label>
               <input
                 type="email"
+                id="register-email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="voce@exemplo.com"
@@ -143,13 +161,14 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">
-                PASSWORD
+              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2" htmlFor="register-password">
+                Senha
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  value={password}
+                  id="register-password"
+                value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Cria uma password forte"
                   required
@@ -190,11 +209,12 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">
-                CONFIRMAR PASSWORD
+              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2" htmlFor="register-confirm">
+                Confirmar senha
               </label>
               <input
                 type={showPassword ? 'text' : 'password'}
+                id="register-confirm"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Repete a password"

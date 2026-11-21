@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const isPublicRoute = pathname === '/' ||
-    /^\/(login|register|forgot-password|reset-password|verify-email|auth\/callback)(\/|$)/.test(pathname ?? '');
+    /^\/(login|register|forgot-password|reset-password|verify-email|resend-verification|auth\/callback)(\/|$)/.test(pathname ?? '');
   const clientRef = useRef<NexusAuthClient>(new NexusAuthClient({ baseUrl: NEXUS_AUTH_URL }));
 
   const [state, setState] = useState<AuthState>({
@@ -113,8 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setState((prev) => ({ ...prev, loading: true, error: null }));
       try {
         await clientRef.current.register({ email, password, name });
-        // Após registo, faz login automaticamente
-        await login(email, password);
+        setState(prev => ({ ...prev, loading: false }));
       } catch (err) {
         const message =
           err instanceof NexusAuthError ? err.message : (err as Error)?.message || 'Registo falhou';
@@ -122,7 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw err;
       }
     },
-    [login],
+    [],
   );
 
   const logout = useCallback(async () => {

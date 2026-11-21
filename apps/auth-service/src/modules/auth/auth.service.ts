@@ -22,6 +22,7 @@ import { MagicLinkDto } from './dto/magic-link.dto';
 import { AuditService } from '../audit/audit.service';
 import { WebhooksDispatcher } from '../webhooks/webhooks.dispatcher';
 import { MetricsService } from '../metrics/metrics.service';
+import { AccountMailService } from './account-mail.service';
 import { hashToken } from '../../common/utils/crypto.util';
 
 @Injectable()
@@ -47,33 +48,29 @@ export class AuthService {
     private auditService: AuditService,
     private webhooksDispatcher: WebhooksDispatcher,
     private metricsService: MetricsService,
+    private readonly accountMail: AccountMailService,
   ) {}
 
   async register(dto: RegisterDto) {
     const lockKey = `register:lock:${dto.email.toLowerCase()}`;
     const lockAcquired = await this.redisService.setNX(lockKey, '1', 10);
     if (!lockAcquired) {
-      return { message: 'If this email is not already registered, an account has been created and a verification link has been sent.' };
+      return { message: 'If eligible, this address will receive account instructions.' };
     }
     try {
       const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
       if (existing) {
-        return { message: 'If this email is not already registered, an account has been created and a verification link has been sent.' };
+        return { message: 'If eligible, this address will receive account instructions.' };
       }
       const hashedPassword = await bcrypt.hash(dto.password, 12);
       const user = await this.prisma.user.create({
         data: { email: dto.email, password: hashedPassword, name: dto.name, passwordHistory: [hashedPassword] },
       });
-      const rawToken = crypto.randomUUID();
-      const hashedToken = hashToken(rawToken);
-      await this.prisma.emailVerification.create({
-        data: { userId: user.id, token: hashedToken, expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
-      });
-      this.logger.debug(`Email verification created for user ${user.id}`);
+      this.accountMail.enqueue('verification', () => this.sendVerification(user.id, user.email));
       await this.auditService.log('REGISTER', { userId: user.id });
       this.metricsService.authRegistrationsTotal.inc();
       await this.webhooksDispatcher.dispatch('user.registered', { userId: user.id, email: user.email, name: user.name }, user.tenantId);
-      return { message: 'If this email is not already registered, an account has been created and a verification link has been sent.' };
+      return { message: 'If eligible, this address will receive account instructions.' };
     } finally {
       await this.redisService.del(lockKey);
     }
@@ -376,42 +373,52 @@ export class AuthService {
     return { message: 'Password changed successfully' };
   }
 
-  async forgotPassword(dto: ForgotPasswordDto) {
-    await this.checkGenericRateLimit(`ratelimit:forgot:${dto.email}`, 3, 300);
-    const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (user) {
-      const rawToken = crypto.randomUUID();
-      const hashedToken = hashToken(rawToken);
+  async resendVerification(dto: ForgotPasswordDto, ipAddress: string) {
+    await this.checkGenericRateLimit(`ratelimit:resend:ip:${ipAddress}`, 12, 300);
+    await this.checkGenericRateLimit(`ratelimit:resend:email:${hashToken(dto.email)}`, 3, 900);
+    await this.checkGenericRateLimit('ratelimit:resend:global', 60, 60);
+    this.accountMail.enqueue('verification', async () => {
+      const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+      if (user && !user.emailVerified) await this.sendVerification(user.id, user.email);
+    });
+    return { message: 'If eligible, this address will receive instructions.' };
+  }
+
+  private async sendVerification(userId: string, email: string) {
+    const token = crypto.randomUUID();
+    await this.prisma.emailVerification.create({
+      data: { userId, token: hashToken(token), expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) },
+    });
+    await this.accountMail.send('verification', email, token);
+  }
+
+  async forgotPassword(dto: ForgotPasswordDto, ipAddress: string) {
+    await this.checkGenericRateLimit(`ratelimit:forgot:ip:${ipAddress}`, 12, 300);
+    await this.checkGenericRateLimit(`ratelimit:forgot:${hashToken(dto.email)}`, 3, 300);
+    await this.checkGenericRateLimit('ratelimit:forgot:global', 60, 60);
+    this.accountMail.enqueue('reset', async () => {
+      const user = await this.prisma.user.findUnique({ where: { email: dto.email } });
+      if (!user?.password) return;
+      const token = crypto.randomUUID();
       await this.prisma.passwordReset.create({
-        data: { userId: user.id, token: hashedToken, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
+        data: { userId: user.id, token: hashToken(token), expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
       });
-      // SECURITY: Never log real tokens — even in development (C6 fix).
-      // Tokens logged to centralised systems (CloudWatch, Datadog, ELK) become permanent exposure.
-      this.logger.debug(`Password reset created for user ${user.id}`);
       await this.auditService.log('PASSWORD_RESET_REQUESTED', { userId: user.id });
-    }
-    return { message: 'If the email exists, a reset link has been sent' };
+      await this.accountMail.send('reset', user.email, token);
+    });
+    return { message: 'If eligible, this address will receive instructions.' };
   }
 
   async resetPassword(dto: ResetPasswordDto, ipAddress: string) {
     await this.checkGenericRateLimit(`ratelimit:reset-pw:${ipAddress}`, 10, 60);
     const tokenHash = hashToken(dto.token);
     await this.checkGenericRateLimit(`ratelimit:reset-pw:token:${tokenHash.substring(0, 16)}`, 5, 300);
-    const hashedToken = hashToken(dto.token);
-    const result = await this.prisma.passwordReset.updateMany({
-      where: { token: hashedToken, used: false, expiresAt: { gt: new Date() } },
-      data: { used: true },
-    });
-    if (result.count === 0) {
-      const reset = await this.prisma.passwordReset.findUnique({ where: { token: hashedToken } });
-      if (!reset) throw new BadRequestException({ code: 'INVALID_RESET_TOKEN', message: 'Invalid or expired reset token' });
-      if (reset.used) throw new BadRequestException({ code: 'RESET_TOKEN_ALREADY_USED', message: 'Reset token has already been used' });
-      throw new BadRequestException({ code: 'RESET_TOKEN_EXPIRED', message: 'Reset token has expired' });
-    }
-    const reset = await this.prisma.passwordReset.findUnique({ where: { token: hashedToken } });
+    const reset = await this.prisma.passwordReset.findUnique({ where: { token: tokenHash }, include: { user: true } });
     if (!reset) throw new BadRequestException({ code: 'INVALID_RESET_TOKEN', message: 'Invalid or expired reset token' });
-    const user = await this.prisma.user.findUnique({ where: { id: reset.userId } });
-    if (!user) throw new NotFoundException({ code: 'USER_NOT_FOUND', message: 'User not found' });
+    if (reset.used) throw new BadRequestException({ code: 'RESET_TOKEN_ALREADY_USED', message: 'Reset token has already been used' });
+    if (reset.expiresAt <= new Date()) throw new BadRequestException({ code: 'RESET_TOKEN_EXPIRED', message: 'Reset token has expired' });
+
+    const { user } = reset;
     for (const oldHash of user.passwordHistory) {
       if (await bcrypt.compare(dto.newPassword, oldHash)) {
         throw new BadRequestException({ code: 'PASSWORD_IN_HISTORY', message: 'New password matches one of the last 5 passwords' });
@@ -419,15 +426,21 @@ export class AuthService {
     }
     const newHash = await bcrypt.hash(dto.newPassword, 12);
     const newHistory = [...user.passwordHistory, newHash].slice(-5);
-    await this.prisma.user.update({ where: { id: user.id }, data: { password: newHash, passwordHistory: newHistory } });
-    const activeSessions = await this.prisma.session.findMany({ where: { userId: user.id, active: true }, select: { id: true } });
-    const sessionIds = activeSessions.map((s) => s.id);
-    if (sessionIds.length > 0) {
-      await this.prisma.$transaction([
-        this.prisma.session.updateMany({ where: { id: { in: sessionIds } }, data: { active: false } }),
-        this.prisma.refreshToken.updateMany({ where: { sessionId: { in: sessionIds }, revoked: false }, data: { revoked: true } }),
-      ]);
-    }
+    await this.prisma.$transaction(async tx => {
+      const changed = await tx.user.updateMany({
+        where: { id: user.id, password: user.password },
+        data: { password: newHash, passwordHistory: newHistory },
+      });
+      if (changed.count !== 1) throw new BadRequestException({ code: 'INVALID_RESET_TOKEN', message: 'Request a new reset link' });
+      const consumed = await tx.passwordReset.updateMany({
+        where: { id: reset.id, used: false, expiresAt: { gt: new Date() } },
+        data: { used: true },
+      });
+      if (consumed.count !== 1) throw new BadRequestException({ code: 'INVALID_RESET_TOKEN', message: 'Invalid or expired reset token' });
+      await tx.passwordReset.updateMany({ where: { userId: user.id, used: false }, data: { used: true } });
+      await tx.session.updateMany({ where: { userId: user.id, active: true }, data: { active: false } });
+      await tx.refreshToken.updateMany({ where: { userId: user.id, revoked: false }, data: { revoked: true } });
+    });
     await this.auditService.log('PASSWORD_RESET_COMPLETED', { userId: user.id });
     return { message: 'Password reset successfully' };
   }
@@ -506,14 +519,26 @@ export class AuthService {
     if (!verification) throw new BadRequestException({ code: 'INVALID_VERIFICATION_TOKEN', message: 'Invalid verification token' });
     if (verification.used) throw new BadRequestException({ code: 'VERIFICATION_TOKEN_ALREADY_USED', message: 'Verification token has already been used' });
     if (verification.expiresAt < new Date()) throw new BadRequestException({ code: 'VERIFICATION_TOKEN_EXPIRED', message: 'Verification token has expired' });
-    const result = await this.prisma.emailVerification.updateMany({
-      where: { token: hashedToken, used: false, expiresAt: { gt: new Date() } },
-      data: { used: true },
+    await this.prisma.$transaction(async tx => {
+      const user = await tx.user.updateMany({
+        where: { id: verification.userId, emailVerified: false },
+        data: { emailVerified: true },
+      });
+      if (user.count !== 1) {
+        throw new BadRequestException({ code: 'VERIFICATION_TOKEN_INVALID', message: 'Invalid or expired verification token' });
+      }
+      const consumed = await tx.emailVerification.updateMany({
+        where: { id: verification.id, used: false, expiresAt: { gt: new Date() } },
+        data: { used: true },
+      });
+      if (consumed.count !== 1) {
+        throw new BadRequestException({ code: 'VERIFICATION_TOKEN_INVALID', message: 'Invalid or expired verification token' });
+      }
+      await tx.emailVerification.updateMany({
+        where: { userId: verification.userId, used: false },
+        data: { used: true },
+      });
     });
-    if (result.count === 0) {
-      throw new BadRequestException({ code: 'VERIFICATION_TOKEN_INVALID', message: 'Invalid or expired verification token' });
-    }
-    await this.prisma.user.update({ where: { id: verification.userId }, data: { emailVerified: true } });
     await this.auditService.log('EMAIL_VERIFIED', { userId: verification.userId });
     return { message: 'Email verified successfully' };
   }

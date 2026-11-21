@@ -169,6 +169,11 @@ function LoginPageContent() {
             </button>
           </form>
 
+          <p className="mt-4 text-center text-sm">
+            <Link href="/resend-verification/" className="text-[var(--color-primary)] hover:underline">
+              Reenviar confirmação de e-mail
+            </Link>
+          </p>
           <div className="mt-6 text-center text-sm text-[var(--color-text-dim)]">
             Não tens conta?{' '}
             <Link

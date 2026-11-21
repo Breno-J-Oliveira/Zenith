@@ -1,218 +1,96 @@
 'use client';
 
-import { Eye, EyeOff } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '../../../../components/auth/AuthProvider';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useAccountLinkToken } from '@/components/auth/useAccountLinkToken';
 import { ZenithMark } from '@/components/layout/ZenithMark';
 
-export default function ResetPasswordClient({ token }: { token: string }) {
-  const router = useRouter();
+export default function ResetPasswordClient({ token: previousLinkToken }: { token?: string }) {
   const { nexusAuthUrl } = useAuth();
-
+  const token = useAccountLinkToken(previousLinkToken);
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [tokenValid, setTokenValid] = useState<boolean | null>(null);
+  const [confirmation, setConfirmation] = useState('');
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'invalid'>('idle');
 
-  useEffect(() => {
-    if (!token) {
-      setError('Token de reset em falta.');
-      setTokenValid(false);
-    }
-  }, [token]);
-
-  const passwordStrength = (() => {
-    if (!password) return { score: 0, label: '', color: '' };
-    let score = 0;
-    if (password.length >= 8) score++;
-    if (/[A-Z]/.test(password)) score++;
-    if (/[0-9]/.test(password)) score++;
-    if (/[^A-Za-z0-9]/.test(password)) score++;
-    const map = [
-      { label: 'Muito fraca', color: 'bg-[var(--color-danger)]' },
-      { label: 'Fraca', color: 'bg-[var(--color-warning)]' },
-      { label: 'Razoável', color: 'bg-[var(--color-warning)]' },
-      { label: 'Boa', color: 'bg-[var(--color-success)]' },
-      { label: 'Forte', color: 'bg-[var(--color-success)]' },
-    ];
-    return { score, ...map[score] };
-  })();
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!token) return;
-    if (!password) {
-      setError('Insere a nova password.');
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!token || status === 'saving') return;
+    if (password !== confirmation) {
+      setError('As senhas precisam ser iguais.');
       return;
     }
-    if (password.length < 8) {
-      setError('A password deve ter no mínimo 8 caracteres.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('As passwords não coincidem.');
-      return;
-    }
-
-    setSubmitting(true);
+    setError('');
+    setStatus('saving');
     try {
-      const res = await fetch(`${nexusAuthUrl}/auth/reset-password`, {
+      const response = await fetch(nexusAuthUrl + '/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, password }),
+        body: JSON.stringify({ token, newPassword: password }),
+        signal: AbortSignal.timeout(15_000),
       });
-
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || `HTTP ${res.status}`);
+      if (response.ok) {
+        setPassword('');
+        setConfirmation('');
+        setStatus('saved');
+        return;
       }
-
-      // Sucesso — redireciona para o login
-      router.push('/login?reset=success');
-    } catch (err) {
-      setError((err as Error).message || 'Erro ao redefinir password');
-    } finally {
-      setSubmitting(false);
+      const data = await response.json().catch(() => ({}));
+      if (typeof data.code === 'string' && /^(INVALID_RESET_TOKEN|RESET_TOKEN_)/.test(data.code)) {
+        setStatus('invalid');
+        return;
+      }
+      setError(data.code === 'PASSWORD_IN_HISTORY'
+        ? 'Escolha uma senha diferente das últimas que você usou.'
+        : response.status === 400 ? 'Confira os requisitos da senha e tente novamente.'
+        : 'Não foi possível salvar agora. Tente novamente.');
+    } catch {
+      setError('Não foi possível salvar agora. Tente novamente.');
     }
-  };
-
-  if (tokenValid === false) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] px-4">
-        <div className="card p-8 hud-border max-w-md text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-danger-glow)] flex items-center justify-center text-3xl">
-            ✕
-          </div>
-          <h2 className="font-orbitron text-xl font-bold text-[var(--color-text)] mb-2">
-            Token inválido
-          </h2>
-          <p className="text-[var(--color-danger)] text-sm mb-6">
-            O link de reset é inválido ou expirou.
-          </p>
-          <Link href="/forgot-password" className="btn btn-primary w-full">
-            Pedir novo link
-          </Link>
-        </div>
-      </div>
-    );
+    setStatus('idle');
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] px-4 py-12 relative overflow-hidden">
-      <div className="absolute inset-0 grid-bg opacity-30 pointer-events-none" />
-
-      <div className="relative w-full max-w-md">
-        <div className="flex flex-col items-center mb-8">
-          <ZenithMark className="mb-4 h-14 w-14 text-[var(--color-primary)]" />
-          <h1 className="font-orbitron text-3xl font-bold tracking-wide">
-            <span className="text-primary">Z</span>
-            <span className="text-[var(--color-text)]">ENITH</span>
-          </h1>
-        </div>
-
-        <div className="card p-8 hud-border">
-          <h2 className="font-orbitron text-xl font-bold text-[var(--color-text)] mb-2">
-            Redefinir password
-          </h2>
-          <p className="text-[var(--color-text-dim)] text-sm mb-6">
-            Escolhe uma password forte para a tua conta.
-          </p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="grid min-h-screen place-items-center px-4 py-12">
+      <main className="card hud-border w-full max-w-md space-y-4 p-6 sm:p-8">
+        <ZenithMark className="h-10 w-10 text-[var(--color-primary)]" />
+        <h1 className="font-orbitron text-xl font-bold">Redefina sua senha</h1>
+        {status === 'saved' ? (
+          <>
+            <p role="status">Senha alterada. Entre com sua nova senha.</p>
+            <Link href="/login/" className="btn btn-primary min-h-11 w-full">Entrar no Zenith</Link>
+          </>
+        ) : token === null ? (
+          <p role="status">Lendo o link…</p>
+        ) : !token || status === 'invalid' ? (
+          <>
+            <p role="alert">Este link é inválido, já foi usado ou expirou.</p>
+            <Link href="/forgot-password/" className="btn btn-primary min-h-11 w-full">Solicitar novo link</Link>
+          </>
+        ) : (
+          <form onSubmit={submit} className="space-y-4">
+            <p id="new-password-hint" className="text-sm text-[var(--color-text-secondary)]">
+              Use pelo menos 8 caracteres, com maiúscula, minúscula, número e símbolo.
+            </p>
             <div>
-              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">
-                NOVA PASSWORD
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
-                  required
-                  autoFocus
-                  autoComplete="new-password"
-                  className="input w-full pr-12"
-                  disabled={submitting}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
-                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
-                >
-                  {showPassword ? <EyeOff aria-hidden="true" className="h-4 w-4 shrink-0" /> : <Eye aria-hidden="true" className="h-4 w-4 shrink-0" />}
-                </button>
-              </div>
-              {password && (
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex-1 h-1 bg-[var(--color-surface-2)] rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${passwordStrength.color} transition-all duration-300`}
-                      style={{ width: `${(passwordStrength.score / 4) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-[var(--color-text-dim)] font-mono w-20 text-right">
-                    {passwordStrength.label}
-                  </span>
-                </div>
-              )}
+              <label htmlFor="account-new-password" className="block pb-1 text-sm">Nova senha</label>
+              <input id="account-new-password" className="input w-full" type="password" autoComplete="new-password"
+                aria-describedby="new-password-hint" minLength={8} maxLength={128} required
+                value={password} onChange={event => setPassword(event.target.value)} />
             </div>
-
             <div>
-              <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">
-                CONFIRMAR PASSWORD
-              </label>
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Repete a password"
-                required
-                autoComplete="new-password"
-                className={`input w-full ${
-                  confirmPassword && confirmPassword !== password
-                    ? 'border-[var(--color-danger)]'
-                    : ''
-                }`}
-                disabled={submitting}
-              />
-              {confirmPassword && confirmPassword !== password && (
-                <p className="mt-1 text-[10px] text-[var(--color-danger)] font-mono">
-                  As passwords não coincidem
-                </p>
-              )}
+              <label htmlFor="account-confirm-password" className="block pb-1 text-sm">Confirmar nova senha</label>
+              <input id="account-confirm-password" className="input w-full" type="password" autoComplete="new-password"
+                required value={confirmation} onChange={event => setConfirmation(event.target.value)} />
             </div>
-
-            {error && (
-              <div className="p-3 rounded-lg bg-[var(--color-danger-glow)] border border-[var(--color-danger)]/40 text-sm text-[var(--color-danger)]">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={submitting}
-              className="btn btn-primary w-full"
-            >
-              {submitting ? (
-                <>
-                  <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  A redefinir...
-                </>
-              ) : (
-                'Redefinir password'
-              )}
+            {error && <p role="alert" className="text-sm text-[var(--color-danger)]">{error}</p>}
+            <button type="submit" disabled={status === 'saving'} className="btn btn-primary min-h-11 w-full">
+              {status === 'saving' ? 'Salvando…' : 'Salvar nova senha'}
             </button>
           </form>
-        </div>
-      </div>
+        )}
+      </main>
     </div>
   );
 }

@@ -106,8 +106,20 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Email enviado (se existir)' })
   async forgotPassword(
     @Body(new ZodValidationPipe(forgotPasswordSchema)) dto: ForgotPasswordDto,
+    @Req() req: Request,
   ) {
-    return this.authService.forgotPassword(dto);
+    return this.authService.forgotPassword(dto, req.ip || 'unknown');
+  }
+
+  @Public()
+  @Post('resend-verification')
+  @HttpCode(202)
+  @ApiOperation({ summary: 'Solicitar novo link de verificação' })
+  async resendVerification(
+    @Body(new ZodValidationPipe(forgotPasswordSchema)) dto: ForgotPasswordDto,
+    @Req() req: Request,
+  ) {
+    return this.authService.resendVerification(dto, req.ip || 'unknown');
   }
 
   @Public()
