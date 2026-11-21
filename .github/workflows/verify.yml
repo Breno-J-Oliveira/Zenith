@@ -1,0 +1,54 @@
+name: Verificar Zenith
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'codex/zenith-m*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zenith-verification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CHECKPOINT_DISABLE: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      ZENITH_TEST_BACKEND: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Instalar pelo lockfile
+        run: npm ci --no-audit --no-fund
+      - name: Gerar Prisma Client e validar migrações SQLite
+        working-directory: apps/backend
+        env:
+          DATABASE_URL: file:./zenith-ci.sqlite
+        run: |
+          node node_modules/prisma/build/index.js generate
+          node node_modules/prisma/build/index.js migrate deploy
+          node node_modules/prisma/build/index.js migrate status
+      - name: Compilar API e executar regressões
+        shell: bash
+        working-directory: apps/backend
+        run: |
+          test_dir=node_modules/.cache/zenith-tests
+          node ../../node_modules/typescript/bin/tsc -p tsconfig.json --incremental false --outDir "$test_dir"
+          mapfile -d '' -t specs < <(find "$test_dir/apps/backend/src" -name '*.spec.js' -print0)
+          test "${#specs[@]}" -gt 0
+          node --test --test-concurrency=1 "${specs[@]}"
+      - name: Lint web
+        run: npm run lint --workspace=apps/web -- --no-cache
+      - name: Build web
+        run: |
+          npm run build --workspace=apps/web
+          git diff --exit-code -- package-lock.json

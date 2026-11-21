@@ -1,9 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { webCorsOrigins } from './cors-origins';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors();
+  app.enableCors({
+    origin: webCorsOrigins(process.env.CORS_ORIGINS, process.env.NODE_ENV === 'production'),
+  });
   const port = Number(process.env.PORT ?? 3002);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     throw new Error('PORT deve ser um número inteiro entre 1 e 65535.');
