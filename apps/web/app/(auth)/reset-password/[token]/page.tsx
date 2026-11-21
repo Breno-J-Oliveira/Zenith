@@ -6,6 +6,7 @@ export function generateStaticParams() {
   return [];
 }
 
-export default function ResetPasswordPage({ params }: { params: { token: string } }) {
-  return <ResetPasswordClient token={params.token} />;
+export default async function ResetPasswordPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  return <ResetPasswordClient token={token} />;
 }

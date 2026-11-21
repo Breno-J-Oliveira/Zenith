@@ -10,7 +10,7 @@
  * in-memory (não persistente — o user terá de fazer login de novo
  * após refresh).
  *
- * ATENÇÃO: Middleware Next.js corre no Edge runtime. Não podemos
+ * ATENÇÃO: O proxy roda no servidor Next.js. Não podemos
  * usar o token store em memória aqui. Por isso, esta é uma proteção
  * "best-effort" via cookie. Para proteção real, ver Fase 9 futura
  * (BFF com httpOnly cookie).
@@ -46,7 +46,7 @@ function isPublicRoute(pathname: string): boolean {
   return PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Rotas públicas — deixar passar

@@ -6,6 +6,7 @@ export function generateStaticParams() {
   return [];
 }
 
-export default function VerifyEmailPage({ params }: { params: { token: string } }) {
-  return <VerifyEmailClient token={params.token} />;
+export default async function VerifyEmailPage({ params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params;
+  return <VerifyEmailClient token={token} />;
 }
