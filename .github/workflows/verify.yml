@@ -21,6 +21,8 @@ jobs:
       CHECKPOINT_DISABLE: '1'
       NEXT_TELEMETRY_DISABLED: '1'
       ZENITH_TEST_BACKEND: 'true'
+      NEXT_PUBLIC_API_URL: http://localhost:3102
+      NEXT_PUBLIC_NEXUS_AUTH_URL: http://localhost:3100
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -73,3 +75,50 @@ jobs:
           assert.equal(login.searchParams.get('next'), route);
           assert.equal((await fetch(login)).status, 200);
           JS
+      - name: Preparar Chromium para o teste autenticado
+        run: |
+          npm install --prefix "$RUNNER_TEMP/zenith-browser" --save-exact --no-audit --no-fund playwright@1.65.0
+          "$RUNNER_TEMP/zenith-browser/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Validar rotina móvel com NexusAuth e API reais
+        shell: bash
+        env:
+          CORS_ORIGINS: http://localhost:3101
+          NEXUS_AUTH_URL: http://localhost:3100
+          PORT: '3102'
+        run: |
+          set -euo pipefail
+          export NEXUS_AUTH_ENV_FILE="$RUNNER_TEMP/zenith-nexus.env"
+          export DATABASE_URL="file:$GITHUB_WORKSPACE/apps/backend/prisma/zenith-ci.sqlite"
+          (umask 077
+            printf 'POSTGRES_PASSWORD=%s\nREDIS_PASSWORD=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 24)" > "$NEXUS_AUTH_ENV_FILE"
+          )
+          compose=(docker compose --project-name zenith-ci-browser --env-file "$NEXUS_AUTH_ENV_FILE"
+            -f apps/auth-service/docker-compose.yml -f apps/auth-service/compose.zenith-test.yml)
+          cleanup() {
+            if [[ -n "${api_pid:-}" ]]; then kill "$api_pid" 2>/dev/null || true; fi
+            if [[ -n "${web_pid:-}" ]]; then kill "$web_pid" 2>/dev/null || true; fi
+            "${compose[@]}" down
+          }
+          trap cleanup EXIT
+          "${compose[@]}" up -d --build --wait --wait-timeout 180 api
+
+          node apps/backend/dist/zenith-tests/apps/backend/src/main.js > "$RUNNER_TEMP/zenith-api.log" 2>&1 &
+          api_pid=$!
+          node node_modules/next/dist/bin/next start apps/web --hostname 127.0.0.1 --port 3101 > "$RUNNER_TEMP/zenith-web-e2e.log" 2>&1 &
+          web_pid=$!
+          await_http() {
+            for attempt in {1..30}; do
+              if curl --fail --silent --max-time 3 "$1" > /dev/null; then return 0; fi
+              sleep 1
+            done
+            curl --fail --silent --show-error --max-time 3 "$1"
+          }
+          if ! await_http http://127.0.0.1:3102/ready; then
+            tail -n 30 "$RUNNER_TEMP/zenith-api.log"
+            exit 1
+          fi
+          if ! await_http http://127.0.0.1:3101/login/; then
+            tail -n 30 "$RUNNER_TEMP/zenith-web-e2e.log"
+            exit 1
+          fi
+          NODE_PATH="$RUNNER_TEMP/zenith-browser/node_modules" node scripts/verify-zenith-browser.cjs

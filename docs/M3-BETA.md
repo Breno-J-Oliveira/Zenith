@@ -4,8 +4,11 @@
 
 O workflow [Verificar Zenith](../.github/workflows/verify.yml) valida instalação
 pelo lockfile no Linux, migrações em SQLite descartável, regressões da API,
-lint e build web. Use o hash do commit verificado como referência. A jornada
-com o NexusAuth e o piloto continuam com verificações próprias.
+lint e build web. A jornada autenticada usa Chromium, banco descartável e duas
+contas fictícias no NexusAuth. Cobre login, perda de resposta na captura, nova
+tentativa sem duplicar, planejamento, conclusão, revisão e isolamento entre
+contas. Use o hash do commit aprovado como referência. O uso diário e as
+verificações em staging têm registros próprios.
 
 ## Antes do primeiro convite
 
@@ -60,14 +63,15 @@ com o NexusAuth e o piloto continuam com verificações próprias.
   chaves de teste, duas contas fizeram login e a API preservou identidades,
   tarefas e isolamento. O backup levou cerca de 120 s e a recuperação
   bem-sucedida, 118 s. Repita a recuperação no staging antes dos convites.
-- A auditoria do candidato com `npm audit --omit=dev` encontrou 67 entradas na árvore
-  de produção (39 moderadas, 27 altas e 1 crítica). A atualização de
-  `proxy-addr` para 2.0.8 e do bcrypt para 6.0.0 removeu dois alertas críticos.
-  O bcrypt 6 validou um hash gerado pela versão 5 em contêiner Linux. A
-  auditoria do NexusAuth isolado encontrou zero críticos, 11 altos e 4 moderados.
-  O Next.js é o alerta crítico restante. A migração exige validação de React,
-  autenticação, calendário, build e lint. Resolva esse alerta e avalie os altos
-  aplicáveis antes da beta. Consulte o [guia de migração do Next.js](https://nextjs.org/docs/app/guides/upgrading/version-16).
+- A atualização de `proxy-addr` para 2.0.8 e do bcrypt para 6.0.0 removeu
+  dois alertas críticos. O bcrypt 6 validou um hash gerado pela versão 5 em
+  contêiner Linux.
+- No candidato com Next.js 16, a auditoria da árvore de produção terminou
+  com zero críticos, 15 altos e 5 moderados após remover o CLI do shadcn e
+  pacotes do Tiptap sem uso no código do app. Antes da remoção, a mesma
+  árvore tinha 25 altos e 39 moderados. Rode `npm audit --omit=dev` no
+  workspace e na raiz isolada do NexusAuth antes de liberar uma versão.
+  Avalie os alertas restantes conforme os caminhos usados em produção.
 
 ## Primeira sessão da beta
 
