@@ -84,10 +84,8 @@ export async function apiFetch<T = any>(path: string, options: FetchOptions = {}
     ...(headers as Record<string, string> | undefined),
   };
 
-  if (!skipAuth) {
-    const token = getAccessToken();
-    if (token) finalHeaders['Authorization'] = `Bearer ${token}`;
-  }
+  const token = skipAuth ? null : getAccessToken();
+  if (token) finalHeaders['Authorization'] = `Bearer ${token}`;
 
   let finalBody: BodyInit | undefined;
   if (body !== undefined && body !== null) {
@@ -113,8 +111,9 @@ export async function apiFetch<T = any>(path: string, options: FetchOptions = {}
       res.statusText ||
       `HTTP ${res.status}`;
 
-    // 401 = token inválido/expirado. Disparar logout no AuthProvider.
-    if (res.status === 401 && typeof window !== 'undefined') {
+    // Só encerra a sessão que originou a chamada. Uma leitura anônima
+    // durante a recarga não deve sobrescrever o destino do login.
+    if (res.status === 401 && token && token === getAccessToken()) {
       window.dispatchEvent(new CustomEvent('zenith:auth:logout'));
     }
 

@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { civilDateAnchor, getCivilDate } from '../../../../packages/shared/src/civil-date';
 import { PrismaService } from '../prisma.service';
 import {
@@ -69,6 +70,7 @@ export class RoutinesService {
     const tasks: Task[] = [];
     const date = civilDateAnchor(getCivilDate());
     const createdDate = civilDateAnchor(getCivilDate(new Date(routine.createdAt)));
+    const occurrencePrefix = `routine-occurrence-${routine.id}-`;
 
     for (let i = 0; i < days; i++, date.setUTCDate(date.getUTCDate() + 1)) {
       const dateStr = date.toISOString().slice(0, 10);
@@ -82,24 +84,48 @@ export class RoutinesService {
       }
 
       if (shouldGenerate) {
+        // A data no ID é a data original da série e não muda ao reagendar.
+        const id = `${occurrencePrefix}${dateStr}`;
         const existing = await this.prisma.task.findFirst({
-          where: { userId, routineId: routine.id, date: dateStr },
+          where: {
+            userId,
+            routineId,
+            OR: [
+              { id },
+              // Registros antigos só têm a data atual como referência.
+              { date: dateStr, NOT: { id: { startsWith: occurrencePrefix } } },
+            ],
+          },
+          select: { id: true },
         });
         if (existing) continue;
 
-        const record = await this.prisma.task.create({
-          data: {
-            userId,
-            routineId: routine.id,
-            title: routine.title,
-            date: dateStr,
-            status: 'ACTIVE',
-            completed: false,
-            time: routine.time,
-            duration: routine.duration,
-          },
-        });
-        tasks.push(this.toRoutineTask(record));
+        try {
+          const record = await this.prisma.task.create({
+            data: {
+              id,
+              userId,
+              routineId,
+              title: routine.title,
+              date: dateStr,
+              status: 'ACTIVE',
+              completed: false,
+              time: routine.time,
+              duration: routine.duration,
+            },
+          });
+          tasks.push(this.toRoutineTask(record));
+        } catch (error) {
+          if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+            throw error;
+          }
+          // Outro processo pode ter inserido a ocorrência após a consulta.
+          const concurrent = await this.prisma.task.findUnique({
+            where: { id, userId, routineId },
+            select: { id: true },
+          });
+          if (!concurrent) throw error;
+        }
       }
     }
 

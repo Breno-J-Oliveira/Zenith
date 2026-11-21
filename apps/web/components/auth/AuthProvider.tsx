@@ -62,6 +62,8 @@ const ZENITH_API_URL =
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const isPublicRoute = pathname === '/' ||
+    /^\/(login|register|forgot-password|reset-password|verify-email|auth\/callback)(\/|$)/.test(pathname ?? '');
   const clientRef = useRef<NexusAuthClient>(new NexusAuthClient({ baseUrl: NEXUS_AUTH_URL }));
 
   const [state, setState] = useState<AuthState>({
@@ -267,13 +269,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Redireciona para /login se não autenticado e tentar aceder a rota protegida
   useEffect(() => {
     if (state.loading) return;
-    const isPublicRoute = pathname === '/' ||
-      /^\/(login|register|forgot-password|reset-password|verify-email|auth\/callback)(\/|$)/.test(pathname ?? '');
     if (!state.isAuthenticated && !isPublicRoute) {
       const next = window.location.pathname + window.location.search;
       router.replace(`/login/?next=${encodeURIComponent(next)}`);
     }
-  }, [state.loading, state.isAuthenticated, pathname, router]);
+  }, [state.loading, state.isAuthenticated, isPublicRoute, pathname, router]);
 
   const value: AuthContextValue = {
     ...state,
@@ -285,7 +285,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     nexusAuthUrl: NEXUS_AUTH_URL,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {isPublicRoute || state.isAuthenticated
+        ? children
+        : <p role="status" className="p-6">Verificando sessão…</p>}
+    </AuthContext.Provider>
+  );
 }
 
 export function useAuth(): AuthContextValue {

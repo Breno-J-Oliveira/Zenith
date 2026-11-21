@@ -22,8 +22,25 @@ export class TasksController {
     @CurrentUser() user: ZenithUser,
     @Query('goalId') goalId?: string,
     @Query('status') status?: TaskStatus,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.tasksService.findAll(user.id, { goalId, status });
+    return this.tasksService.findAll(user.id, { goalId, status, from, to });
+  }
+
+  @Post('capture')
+  capture(@CurrentUser() user: ZenithUser, @Body() body: unknown) {
+    return this.tasksService.capture(user.id, body);
+  }
+
+  @Get('personal')
+  findPersonal(@CurrentUser() user: ZenithUser, @Query('from') from: string) {
+    return this.tasksService.findPersonal(user.id, from);
+  }
+
+  @Patch('personal/:id')
+  updatePersonal(@CurrentUser() user: ZenithUser, @Param('id') id: string, @Body() body: unknown) {
+    return this.tasksService.updatePersonal(user.id, id, body);
   }
 
   @Get(':id')
