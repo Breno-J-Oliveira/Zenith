@@ -77,7 +77,7 @@ export class NexusAuthClient {
 
   // ─── Autenticação ──────────────────────────────────────────────
 
-  async register(input: { email: string; password: string; name: string }): Promise<{ id: string; email: string; name: string }> {
+  async register(input: { email: string; password: string; name: string; captchaToken?: string }): Promise<{ id: string; email: string; name: string }> {
     return this.request('POST', '/auth/register', input);
   }
 

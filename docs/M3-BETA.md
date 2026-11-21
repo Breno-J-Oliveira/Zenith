@@ -70,8 +70,13 @@ verificações em staging têm registros próprios.
   já emitido pode ser aceito até expirar em serviços que validam apenas sua
   assinatura. Verifique o comportamento ponta a ponta no staging.
 - O CI usa um coletor SMTP descartável. A entrega em caixas reais, as
-  configurações de remetente e o fluxo CAPTCHA de produção exigem validação
+  configurações de remetente e as chaves reais de CAPTCHA exigem validação
   no staging. Confirme também os links de login social antes dos convites.
+- Para o cadastro, configure `NEXT_PUBLIC_TURNSTILE_SITE_KEY` no build web,
+  `TURNSTILE_SECRET_KEY` no NexusAuth e `TURNSTILE_EXPECTED_HOSTNAME` com o
+  hostname da web sem protocolo ou porta. O NexusAuth confere a ação
+  `zenith_register` quando o hostname esperado está configurado. Teste
+  sucesso, expiração e nova tentativa. Use chaves exclusivas do ambiente.
 
 ## Evidência local
 

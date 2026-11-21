@@ -61,12 +61,38 @@ async function confirmedFixture(name) {
 }
 
 async function registerFromBrowser(page, credentials) {
+  await page.route(url => url.origin === 'https://challenges.cloudflare.com' &&
+    url.pathname === '/turnstile/v0/api.js', route => route.fulfill({
+    contentType: 'application/javascript',
+    body: `
+      window.turnstile = {
+        render(container, options) {
+          if (options.action !== 'zenith_register') throw new Error('Ação inesperada');
+          window.zenithTestChallenge = options;
+          return 'fixture';
+        },
+        reset() { window.zenithTestChallenge.callback('zenith-ci-captcha-token'); },
+        remove() {},
+      };
+    `,
+  }));
   await page.goto(web + '/register/');
   await page.getByLabel('Nome', { exact: true }).fill('Zenith Fixture A');
   await page.getByLabel('E-mail', { exact: true }).fill(credentials.email);
   await page.getByLabel('Senha', { exact: true }).fill(credentials.password);
   await page.getByLabel('Confirmar senha', { exact: true }).fill(credentials.password);
-  await page.getByRole('button', { name: 'Criar conta', exact: true }).click();
+  const create = page.getByRole('button', { name: 'Criar conta', exact: true });
+  await page.waitForFunction(() => Boolean(window.zenithTestChallenge));
+  assert.equal(await create.isEnabled(), false);
+  await page.evaluate(() => window.zenithTestChallenge['expired-callback']());
+  await page.getByText('A verificação expirou. Tente novamente.').waitFor();
+  await page.getByRole('button', { name: 'Refazer verificação', exact: true }).click();
+  const [registration] = await Promise.all([
+    page.waitForResponse(response => response.url() === auth + '/auth/register' && response.request().method() === 'POST'),
+    create.click(),
+  ]);
+  assert.equal(registration.status(), 201);
+  assert.equal(registration.request().postDataJSON().captchaToken, 'zenith-ci-captcha-token');
   await page.getByRole('heading', { name: 'Confira seu e-mail' }).waitFor();
 
   const first = await mailLink(credentials.email, 'verification');
@@ -77,21 +103,25 @@ async function registerFromBrowser(page, credentials) {
   const resent = await mailLink(credentials.email, 'verification', first.id);
   assert.equal(first.url.hash === resent.url.hash, false);
 
+  let clickedVerificationRequests = 0;
+  page.on('request', request => {
+    if (request.method() === 'POST' && request.url() === auth + '/auth/verify-email') clickedVerificationRequests++;
+  });
   await page.goto(resent.url.href);
   const confirmation = page.getByRole('button', { name: 'Confirmar e-mail', exact: true });
   await confirmation.waitFor();
   assert.equal(new URL(page.url()).hash, '');
-  await request(auth + '/auth/login', { body: credentials, expected: 401 });
+  assert.equal(clickedVerificationRequests, 0, 'Abrir o link não deve confirmar o e-mail');
   await confirmation.click();
   await page.getByText('E-mail confirmado. Sua conta está pronta para entrar.').waitFor();
+  assert.equal(clickedVerificationRequests, 1);
   await request(auth + '/auth/verify-email', { body: { token: first.url.hash.slice(1) }, expected: 400 });
   const generic = await request(auth + '/auth/resend-verification', { body: { email: 'missing@example.com' }, expected: 202 });
   const verified = await request(auth + '/auth/resend-verification', { body: { email: credentials.email }, expected: 202 });
   assert.deepEqual(verified, generic);
 }
 
-async function verifyPasswordRecovery(page, owner) {
-  const original = await request(auth + '/auth/login', { body: owner });
+async function verifyPasswordRecovery(page, owner, previousRefreshToken) {
   await page.goto(web + '/forgot-password/');
   await page.getByLabel('E-mail', { exact: true }).fill(owner.email);
   await page.getByRole('button', { name: 'Solicitar link', exact: true }).click();
@@ -110,7 +140,7 @@ async function verifyPasswordRecovery(page, owner) {
   await confirmation.fill(newPassword);
   await save.click();
   await page.getByText('Senha alterada. Entre com sua nova senha.').waitFor();
-  await request(auth + '/auth/refresh', { body: { refreshToken: original.refreshToken }, expected: 401 });
+  await request(auth + '/auth/refresh', { body: { refreshToken: previousRefreshToken }, expected: 401 });
   await request(auth + '/auth/reset-password', { body: { token: url.hash.slice(1), newPassword }, expected: 400 });
   await request(auth + '/auth/login', { body: owner, expected: 401 });
   await page.getByRole('link', { name: 'Entrar no Zenith', exact: true }).click();
@@ -214,7 +244,8 @@ async function verify() {
     assert.ok(rotated?.value && rotated.value !== refresh.value, 'O NexusAuth deve rotacionar o refresh');
 
     await request(`${api}/tasks/${task.id}`, { token: visitorToken, expected: 404 });
-    const { accessToken: ownerToken } = await request(auth + '/auth/login', { body: owner });
+    const ownerSession = await request(auth + '/auth/login', { body: owner });
+    const ownerToken = ownerSession.accessToken;
     assert.ok(ownerToken, 'A conta proprietária deve receber um access token');
     const savedTask = await request(`${api}/tasks/${task.id}`, { token: ownerToken });
     assert.equal(savedTask.completed, true);
@@ -271,7 +302,7 @@ async function verify() {
     assert.equal((await context.cookies()).some(cookie => cookie.name === 'zenith_refresh'), false);
     await page.goto(web + '/hoje/');
     await page.waitForURL(url => url.pathname === '/login/');
-    await verifyPasswordRecovery(page, owner);
+    await verifyPasswordRecovery(page, owner, ownerSession.refreshToken);
     console.log('Cadastro com confirmação, reenvio e recuperação de senha validados pelo SMTP de teste.');
     console.log('Jornada móvel validada: recarga com sessão, rotação, logout e rotina com isolamento.');
   } finally {

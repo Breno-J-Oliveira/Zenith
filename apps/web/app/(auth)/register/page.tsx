@@ -5,7 +5,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../components/auth/AuthProvider';
+import { RegistrationChallenge } from '@/components/auth/RegistrationChallenge';
 import { ZenithMark } from '@/components/layout/ZenithMark';
+
+const captchaSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -18,6 +21,8 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaAttempt, setCaptchaAttempt] = useState(0);
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,16 +61,24 @@ export default function RegisterPage() {
       setLocalError('As passwords não coincidem.');
       return;
     }
+    if (captchaSiteKey && !captchaToken) {
+      setLocalError('Conclua a verificação de segurança para continuar.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await register(email, password, name);
+      await register(email, password, name, captchaToken || undefined);
       setPassword('');
       setConfirmPassword('');
       setSubmitted(true);
     } catch (err) {
+      setCaptchaToken('');
+      setCaptchaAttempt(count => count + 1);
       const msg = (err as Error).message || 'Erro ao registar';
       // Traduzir erros comuns do NexusAuth
-      if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
+      if (/captcha/i.test(msg)) {
+        setLocalError('Não foi possível concluir a verificação. Tente novamente.');
+      } else if (msg.includes('already') || msg.includes('exists') || msg.includes('registered')) {
         setLocalError('Este email já está registado. Tenta fazer login.');
       } else if (msg.includes('password') || msg.includes('Password')) {
         setLocalError('Password não cumpre os requisitos de segurança.');
@@ -240,9 +253,12 @@ export default function RegisterPage() {
               </div>
             )}
 
+            {captchaSiteKey && (
+              <RegistrationChallenge key={captchaAttempt} siteKey={captchaSiteKey} onToken={setCaptchaToken} />
+            )}
             <button
               type="submit"
-              disabled={submitting || loading || !allValid}
+              disabled={submitting || loading || !allValid || (!!captchaSiteKey && !captchaToken)}
               className="btn btn-primary w-full"
             >
               {submitting ? (

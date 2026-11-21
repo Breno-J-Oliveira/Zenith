@@ -39,7 +39,7 @@ interface AuthState {
 
 interface AuthContextValue extends AuthState {
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
+  register: (email: string, password: string, name: string, captchaToken?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   /** True se o backend tem o NexusAuth configurado e operacional */
@@ -109,10 +109,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [applySession, refreshUser]);
 
   const register = useCallback(
-    async (email: string, password: string, name: string) => {
+    async (email: string, password: string, name: string, captchaToken?: string) => {
       setState((prev) => ({ ...prev, loading: true, error: null }));
       try {
-        await clientRef.current.register({ email, password, name });
+        await clientRef.current.register({ email, password, name, captchaToken });
         setState(prev => ({ ...prev, loading: false }));
       } catch (err) {
         const message =

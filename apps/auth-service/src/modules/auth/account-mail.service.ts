@@ -31,7 +31,7 @@ export class AccountMailService {
     this.origin = config.get<string>('ACCOUNT_LINK_ORIGIN');
     if (!this.from || !this.origin) throw new Error('SMTP_FROM e ACCOUNT_LINK_ORIGIN são necessários com SMTP_HOST.');
 
-    const port = config.get<number>('SMTP_PORT') ?? 587;
+    const port = Number(config.get('SMTP_PORT') || 587);
     const user = config.get<string>('SMTP_USER');
     const pass = config.get<string>('SMTP_PASS');
     if (Boolean(user) !== Boolean(pass)) throw new Error('Configure SMTP_USER e SMTP_PASS juntos.');

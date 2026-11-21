@@ -54,7 +54,7 @@ export async function verifyCaptcha(
     formData.append('remoteip', ipAddress);
   }
 
-  let result: { success: boolean; 'error-codes'?: string[] };
+  let result: { success: boolean; hostname?: string; action?: string; 'error-codes'?: string[] };
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
@@ -81,9 +81,11 @@ export async function verifyCaptcha(
     });
   }
 
-  if (!result.success) {
+  const expectedHostname = process.env.TURNSTILE_EXPECTED_HOSTNAME;
+  if (result.success !== true || (expectedHostname &&
+      (result.hostname !== expectedHostname || result.action !== 'zenith_register'))) {
     const errorCodes = result['error-codes']?.join(', ') || 'unknown';
-    Logger.warn(`CAPTCHA verification failed: ${errorCodes} (IP: ${ipAddress || 'unknown'})`, 'CaptchaGuard');
+    Logger.warn(`CAPTCHA verification failed: ${errorCodes}`, 'CaptchaGuard');
     throw new BadRequestException({
       code: 'CAPTCHA_FAILED',
       message: 'CAPTCHA verification failed. Please try again.',

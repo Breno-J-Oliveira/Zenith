@@ -24,6 +24,7 @@ jobs:
       NEXT_PUBLIC_API_URL: http://localhost:3102
       NEXT_PUBLIC_NEXUS_AUTH_URL: http://localhost:3100
       ZENITH_WEB_ORIGIN: http://localhost:3101
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: zenith-ci-widget-test-key
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -123,4 +124,5 @@ jobs:
             tail -n 30 "$RUNNER_TEMP/zenith-web-e2e.log"
             exit 1
           fi
+          "${compose[@]}" exec -T api node - < scripts/verify-nexus-captcha.cjs
           NODE_PATH="$RUNNER_TEMP/zenith-browser/node_modules" node scripts/verify-zenith-browser.cjs
