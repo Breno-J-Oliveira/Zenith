@@ -16,7 +16,7 @@
  *   NEXT_PUBLIC_NEXUS_AUTH_URL=http://localhost:3000   (URL do NexusAuth)
  *   NEXT_PUBLIC_API_URL=http://localhost:3002           (URL do Zenith backend)
  *
- * Tokens são guardados IN-MEMORY por defeito (mais seguro contra XSS).
+ * O refresh token fica em cookie HttpOnly. O access token usado pela API fica em memória.
  */
 
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
@@ -24,16 +24,14 @@ import { useRouter, usePathname } from 'next/navigation';
 import {
   NexusAuthClient,
   NexusUser,
-  AuthTokens,
   NexusAuthError,
 } from '@zenith/shared';
-import { loadTokens, saveTokens } from '@zenith/shared';
+import { saveTokens } from '@zenith/shared';
 
-const REFRESH_THRESHOLD_MS = 30 * 1000; // refresh 30s antes de expirar
+import { requestWebSession, type WebSession } from '@/lib/web-session';
 
 interface AuthState {
   user: NexusUser | null;
-  tokens: AuthTokens | null;
   isAuthenticated: boolean;
   loading: boolean;
   error: string | null;
@@ -55,9 +53,6 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const NEXUS_AUTH_URL =
   (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_NEXUS_AUTH_URL) ||
   'http://localhost:3000';
-const ZENITH_API_URL =
-  (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_API_URL) ||
-  'http://localhost:3002';
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -68,7 +63,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [state, setState] = useState<AuthState>({
     user: null,
-    tokens: null,
     isAuthenticated: false,
     loading: true,
     error: null,
@@ -76,134 +70,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const [nexusHealthy, setNexusHealthy] = useState<boolean | null>(null);
 
-  // ─── Helpers internos ───────────────────────────────────────────
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-  const loadTokensSafe = useCallback((): AuthTokens | null => {
-    try {
-      const raw = loadTokens();
-      return raw ? JSON.parse(raw) : null;
-    } catch {
-      return null;
-    }
+  const applySession = useCallback((session: WebSession | null) => {
+    clearTimeout(timer.current);
+    saveTokens(session ? JSON.stringify({ accessToken: session.accessToken }) : null);
+    setState({ user: session?.user ?? null, isAuthenticated: !!session, loading: false, error: null });
   }, []);
 
-  const saveTokensSafe = useCallback((tokens: AuthTokens | null) => {
-    saveTokens(tokens ? JSON.stringify(tokens) : null);
-    if (typeof document !== 'undefined') {
-      // O middleware usa apenas o marcador. A API valida o JWT em cada rota.
-      const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-      document.cookie = tokens
-        ? `zenith_auth=authenticated; Path=/; SameSite=Lax${secure}`
-        : `zenith_auth=; Path=/; Max-Age=0; SameSite=Lax${secure}`;
-    }
-  }, []);
-
-  const clearAuth = useCallback(() => {
-    saveTokensSafe(null);
-    setState({
-      user: null,
-      tokens: null,
-      isAuthenticated: false,
-      loading: false,
-      error: null,
-    });
-  }, [saveTokensSafe]);
-
-  /** Faz um GET ao Zenith com o Bearer token; devolve o user sincronizado */
-  const fetchZenithUser = useCallback(async (accessToken: string): Promise<NexusUser | null> => {
+  const refreshUser = useCallback(async function restore() {
     try {
-      const res = await fetch(`${ZENITH_API_URL}/auth/me`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (!res.ok) return null;
-      return await res.json();
+      const session = await requestWebSession({ action: 'restore' });
+      applySession(session);
+      if (session) timer.current = setTimeout(restore, 30_000);
     } catch {
-      return null;
+      setState(prev => ({ ...prev, loading: false, error: 'Não foi possível confirmar a sessão.' }));
+      timer.current = setTimeout(restore, 30_000);
     }
-  }, []);
+  }, [applySession]);
 
-  const refreshUser = useCallback(async () => {
-    const tokens = loadTokensSafe();
-    if (!tokens) return;
-
+  const login = useCallback(async (email: string, password: string) => {
+    setState(prev => ({ ...prev, loading: true, error: null }));
     try {
-      const user = await fetchZenithUser(tokens.accessToken);
-      if (user) {
-        setState((prev) => ({ ...prev, user, isAuthenticated: true, loading: false }));
-      } else {
-        clearAuth();
-      }
-    } catch {
-      clearAuth();
+      const session = await requestWebSession({ action: 'login', email, password });
+      applySession(session);
+      timer.current = setTimeout(refreshUser, 30_000);
+    } catch (error) {
+      setState(prev => ({ ...prev, loading: false, error: (error as Error).message }));
+      throw error;
     }
-  }, [loadTokensSafe, fetchZenithUser, clearAuth]);
-
-  // Agenda refresh automático do access token
-  const scheduleRefresh = useCallback(
-    (tokens: AuthTokens) => {
-      try {
-        const payloadText = tokens.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-        const payload = JSON.parse(atob(payloadText));
-        const expMs = payload.exp * 1000;
-        const delay = expMs - Date.now() - REFRESH_THRESHOLD_MS;
-        if (delay <= 0) return;
-
-        const timeoutId = setTimeout(async () => {
-          const isCurrentSession = () => loadTokensSafe()?.refreshToken === tokens.refreshToken;
-          if (!isCurrentSession()) return;
-          try {
-            const newTokens = await clientRef.current.refresh(tokens.refreshToken);
-            if (!isCurrentSession()) return;
-            saveTokensSafe(newTokens);
-            setState((prev) => ({ ...prev, tokens: newTokens }));
-            scheduleRefresh(newTokens);
-          } catch {
-            if (isCurrentSession()) clearAuth();
-          }
-        }, delay);
-        return () => clearTimeout(timeoutId);
-      } catch {
-        // Token malformado
-      }
-    },
-    [loadTokensSafe, saveTokensSafe, clearAuth],
-  );
-
-  // ─── Ações públicas ───────────────────────────────────────────
-
-  const login = useCallback(
-    async (email: string, password: string) => {
-      setState((prev) => ({ ...prev, loading: true, error: null }));
-      try {
-        const tokens = await clientRef.current.login({ email, password });
-        const user = await fetchZenithUser(tokens.accessToken);
-        if (!user) {
-          throw new Error('O Zenith não conseguiu confirmar a sessão. Tente entrar novamente.');
-        }
-        saveTokensSafe(tokens);
-        setState({
-          user,
-          tokens,
-          isAuthenticated: true,
-          loading: false,
-          error: null,
-        });
-        scheduleRefresh(tokens);
-      } catch (err) {
-        const message =
-          err instanceof NexusAuthError ? err.message : (err as Error)?.message || 'Login falhou';
-        setState({
-          user: null,
-          tokens: null,
-          isAuthenticated: false,
-          loading: false,
-          error: message,
-        });
-        throw err;
-      }
-    },
-    [fetchZenithUser, saveTokensSafe, scheduleRefresh],
-  );
+  }, [applySession, refreshUser]);
 
   const register = useCallback(
     async (email: string, password: string, name: string) => {
@@ -223,17 +119,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    const tokens = loadTokensSafe();
-    if (tokens) {
-      try {
-        await clientRef.current.logout(tokens.refreshToken, tokens.accessToken);
-      } catch {
-        // Ignorar erros de logout
-      }
+    try {
+      await requestWebSession({ action: 'logout' });
+      applySession(null);
+      router.push('/login/');
+    } catch {
+      setState(prev => ({ ...prev, error: 'Não foi possível sair. Tente novamente.' }));
     }
-    clearAuth();
-    router.push('/login');
-  }, [loadTokensSafe, clearAuth, router]);
+  }, [applySession, router]);
 
   // ─── Efeitos ──────────────────────────────────────────────────
 
@@ -253,27 +146,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // No mount, tenta restaurar sessão a partir dos tokens em memória
   useEffect(() => {
-    const tokens = loadTokensSafe();
-    if (!tokens) {
-      saveTokensSafe(null);
-      setState((prev) => ({ ...prev, loading: false }));
-      return;
-    }
-    refreshUser();
-    const cleanup = scheduleRefresh(tokens);
-    return cleanup;
-  }, [loadTokensSafe, refreshUser, saveTokensSafe, scheduleRefresh]);
+    void refreshUser();
+    return () => clearTimeout(timer.current);
+  }, [refreshUser]);
 
   // Redireciona para /login se não autenticado e tentar aceder a rota protegida
   useEffect(() => {
-    if (state.loading) return;
+    if (state.loading || state.error) return;
     if (!state.isAuthenticated && !isPublicRoute) {
       const next = window.location.pathname + window.location.search;
       router.replace(`/login/?next=${encodeURIComponent(next)}`);
     }
-  }, [state.loading, state.isAuthenticated, isPublicRoute, pathname, router]);
+  }, [state.loading, state.isAuthenticated, isPublicRoute, state.error, pathname, router]);
 
   const value: AuthContextValue = {
     ...state,
@@ -287,9 +172,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={value}>
+      {state.isAuthenticated && state.error && <p role="alert">{state.error}</p>}
       {isPublicRoute || state.isAuthenticated
-        ? children
-        : <p role="status" className="p-6">Verificando sessão…</p>}
+        ? <React.Fragment key={state.user?.id ?? 'public'}>{children}</React.Fragment>
+        : <p role="status" className="p-6">{state.error ?? 'Verificando sessão…'}</p>}
     </AuthContext.Provider>
   );
 }

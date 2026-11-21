@@ -105,11 +105,21 @@ async function verify() {
     assert.equal(await page.getByText(title, { exact: true }).count(), 1);
 
     await page.reload();
-    await page.waitForURL(url => url.pathname === '/login/');
-    assert.equal(new URL(page.url()).searchParams.get('next'), '/relatorio/');
-    await signIn(page, owner);
-    await page.waitForURL(url => url.pathname === '/relatorio/');
     await page.getByText(title, { exact: true }).waitFor();
+    const context = page.context();
+    const refresh = (await context.cookies()).find(cookie => cookie.name === 'zenith_refresh');
+    assert.equal(refresh?.httpOnly, true);
+    const rejected = await context.request.post(web + '/api/session/', {
+      headers: { Origin: 'http://example.invalid' },
+      data: { action: 'logout' },
+    });
+    assert.equal(rejected.status(), 403);
+
+    await context.clearCookies({ name: 'zenith_access' });
+    await page.reload();
+    await page.getByText(title, { exact: true }).waitFor();
+    const rotated = (await context.cookies()).find(cookie => cookie.name === 'zenith_refresh');
+    assert.ok(rotated?.value && rotated.value !== refresh.value, 'O NexusAuth deve rotacionar o refresh');
 
     await request(`${api}/tasks/${task.id}`, { token: visitorToken, expected: 404 });
     const { accessToken: ownerToken } = await request(auth + '/auth/login', { body: owner });
@@ -140,7 +150,13 @@ async function verify() {
     assert.equal(savedPage.title, 'Nova Página');
     await request(`${api}/pages/${pageId}`, { token: visitorToken, expected: 404 });
 
-    console.log('Jornada móvel validada: login, recuperação da captura, planejamento, conclusão, revisão, calendário, criação de página e isolamento.');
+    await page.getByRole('button', { name: 'Menu da conta' }).click();
+    await page.getByRole('button', { name: 'Sair', exact: true }).click();
+    await page.waitForURL(url => url.pathname === '/login/');
+    assert.equal((await context.cookies()).some(cookie => cookie.name === 'zenith_refresh'), false);
+    await page.goto(web + '/hoje/');
+    await page.waitForURL(url => url.pathname === '/login/');
+    console.log('Jornada móvel validada: recarga com sessão, rotação, logout e rotina com isolamento.');
   } finally {
     await browser.close();
   }

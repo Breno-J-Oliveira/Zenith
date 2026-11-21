@@ -19,12 +19,11 @@ import { useAuth } from './AuthProvider';
  * Deve ser renderizado uma vez dentro do AuthProvider.
  */
 export function AuthEventsListener() {
-  const { logout } = useAuth();
+  const { refreshUser } = useAuth();
 
   useEffect(() => {
     const handleLogout = () => {
-      // Limpa o estado e redireciona para /login
-      logout();
+      void refreshUser();
     };
 
     window.addEventListener('zenith:auth:logout', handleLogout);
@@ -32,7 +31,7 @@ export function AuthEventsListener() {
     return () => {
       window.removeEventListener('zenith:auth:logout', handleLogout);
     };
-  }, [logout]);
+  }, [refreshUser]);
 
   return null;
 }

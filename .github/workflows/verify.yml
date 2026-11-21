@@ -23,6 +23,7 @@ jobs:
       ZENITH_TEST_BACKEND: 'true'
       NEXT_PUBLIC_API_URL: http://localhost:3102
       NEXT_PUBLIC_NEXUS_AUTH_URL: http://localhost:3100
+      ZENITH_WEB_ORIGIN: http://localhost:3101
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
