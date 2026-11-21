@@ -253,7 +253,7 @@ export default function RotinasPage() {
               </svg>
             </div>
             <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">Nenhuma rotina</p>
-            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em "Nova Rotina" para criar um hábito.</p>
+            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em &quot;Nova Rotina&quot; para criar um hábito.</p>
           </div>
         ) : (
           <div className="space-y-3">

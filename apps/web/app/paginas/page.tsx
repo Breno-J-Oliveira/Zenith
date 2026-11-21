@@ -94,7 +94,7 @@ function PaginasPageContent() {
               </svg>
             </div>
             <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">Nenhuma página</p>
-            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em "Nova Página" para começar a organizar suas ideias.</p>
+            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em &quot;Nova Página&quot; para começar a organizar suas ideias.</p>
           </div>
         ) : (
           <div className="card p-4 hud-border">

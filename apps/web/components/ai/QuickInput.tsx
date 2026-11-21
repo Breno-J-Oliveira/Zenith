@@ -145,7 +145,7 @@ export function QuickInput() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm text-white truncate">{action.summary}</p>
-                  <p className="font-mono text-xs text-dim truncate">"{action.text}"</p>
+                  <p className="font-mono text-xs text-dim truncate">&quot;{action.text}&quot;</p>
                   {action.reorgMessage && (
                     <p className="font-mono text-xs text-primary mt-1">{action.reorgMessage}</p>
                   )}

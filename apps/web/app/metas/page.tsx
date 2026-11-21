@@ -346,7 +346,7 @@ function MetasPageContent() {
               </svg>
             </div>
             <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">Nenhuma meta</p>
-            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em "Nova Meta" para começar.</p>
+            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em &quot;Nova Meta&quot; para começar.</p>
           </div>
         ) : (
           <div className="space-y-4">

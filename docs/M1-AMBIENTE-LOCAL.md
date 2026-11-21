@@ -50,6 +50,21 @@ npx prisma migrate deploy
 npm run dev
 ```
 
+Se o engine do Prisma falhar no Windows, use a alternativa abaixo para criar
+uma base fictícia com o Prisma 6.19.3 no Linux. Execute no terminal da API, em
+`apps/backend`. O contêiner recebe apenas o schema e as migrações copiados
+para um diretório temporário novo.
+
+```powershell
+$fixtureDir = Join-Path $env:TEMP ('zenith-fixture-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $fixtureDir | Out-Null
+Copy-Item -Path prisma/schema.prisma,prisma/migrations -Destination $fixtureDir -Recurse
+docker run --rm --mount "type=bind,src=$fixtureDir,dst=/fixture" -e DATABASE_URL=file:/fixture/zenith.sqlite node:24-alpine sh -ec 'cd /tmp; npm install --no-audit --no-fund prisma@6.19.3; ./node_modules/.bin/prisma migrate deploy --schema /fixture/schema.prisma; ./node_modules/.bin/prisma migrate status --schema /fixture/schema.prisma'
+if ($LASTEXITCODE -ne 0) { throw 'Migração de teste falhou.' }
+$env:DATABASE_URL = 'file:' + (Join-Path $fixtureDir 'zenith.sqlite').Replace('\', '/')
+npm run dev
+```
+
 Em um terceiro terminal, a partir da raiz:
 
 ```powershell
@@ -96,4 +111,13 @@ $b = Get-Credential -Message 'Conta fictícia B'
 - Os três testes de isolamento com dependências simuladas passaram para calendário, parser/briefing e ferramentas do chat. Uma conta fictícia fez login no NexusAuth e recebeu HTTP 200 em `/auth/me` no Zenith. O isolamento HTTP com duas contas e o retorno autenticado a Hoje ainda exigem o smoke do ambiente completo.
 - As quatro migrações do NexusAuth foram aplicadas no PostgreSQL descartável. A imagem reconstruída conferiu as migrações com o Prisma instalado no build e a integração respondeu HTTP 200 em `/auth/health`. O cadastro fictício respondeu HTTP 201. A repetição do smoke atingiu o limite de cadastros por origem e recebeu HTTP 429.
 - No Windows, `prisma migrate deploy` no SQLite retornou `Schema engine error`. A aplicação direta dos arquivos SQL em uma base fictícia passou em `PRAGMA integrity_check`. Isso permitiu iniciar a API isolada e deixou pendente a repetição do roteiro pelo comando Prisma.
-- O marco fica aberto até a verificação autenticada e o build do candidato. A branch de progresso pode ser revisada enquanto essas verificações estão pendentes.
+- A branch de progresso pode ser revisada enquanto as verificações do marco estão em andamento.
+
+## Verificação integrada em 21/11/2026
+
+- O NexusAuth, o PostgreSQL e o Redis responderam saudáveis no projeto descartável. A web respondeu 200 no login, e `GET /ready` confirmou o banco e a autenticação.
+- Duas contas fictícias fizeram login com o NexusAuth. A API reconheceu identidades distintas e confirmou isolamento de compromissos, conversas e briefing. As rotas de calendário e briefing recusaram requisições sem sessão.
+- Em Chrome com viewport de 390 × 844, abrir `/hoje/` redirecionou para o login. O formulário recebeu confirmação do NexusAuth e da API, e o navegador abriu Hoje.
+- A tentativa de `prisma migrate deploy` em banco novo voltou a retornar `Schema engine error` no Windows. No Linux, o Prisma 6.19.3 aplicou as quatro migrações em um SQLite descartável. `prisma migrate status` confirmou o schema atualizado.
+- O build web de produção compilou, passou pela checagem de tipos e gerou 17 páginas. O snapshot reutilizou as dependências locais. A verificação automática do lockfile do Next foi desativada nessa execução. O lint separado passou com quatro avisos preexistentes sobre imagens.
+- Estado: M1 concluído para o fluxo local com a alternativa Linux documentada. A migração nativa no Windows, instalação limpa com lockfile e jornada OAuth não foram comprovadas nesta validação. O M2 começa pela captura manual de uma tarefa, triagem e conclusão em Hoje.

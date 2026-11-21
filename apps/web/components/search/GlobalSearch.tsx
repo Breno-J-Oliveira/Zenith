@@ -317,7 +317,7 @@ export function GlobalSearch({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 Nenhum resultado encontrado
               </p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                Tente buscar por "{query}"
+                Tente buscar por &quot;{query}&quot;
               </p>
             </div>
           ) : (

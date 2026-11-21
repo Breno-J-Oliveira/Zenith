@@ -129,7 +129,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
                 Nenhum comando encontrado
               </p>
               <p className="text-xs text-[var(--color-text-muted)]">
-                Tente buscar por "{query}"
+                Tente buscar por &quot;{query}&quot;
               </p>
             </div>
           ) : (
