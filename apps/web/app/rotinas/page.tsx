@@ -1,362 +1,276 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useEffect, useRef, useState, type FormEvent } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
+import { CalendarDays, Clock, Pencil, Plus, Repeat, Trash2 } from 'lucide-react';
+import type { Routine, Task } from '@zenith/shared';
+import { civilDateAnchor, getCivilDate } from '../../../../packages/shared/src/civil-date';
 import { ShellLayout } from '../../components/layout/ShellLayout';
-import { API, apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api';
 
-interface Routine {
-  id: string;
-  title: string;
-  frequency: 'daily' | 'weekly' | 'monthly';
-  time: string;
-  duration: number;
-  active: boolean;
-  adaptable: boolean;
-  createdAt: string;
-}
-
-// API importado de '@/lib/api'
-
-const frequencyLabels: Record<string, string> = {
+const frequencyLabels: Record<Routine['frequency'], string> = {
   daily: 'Diária',
   weekly: 'Semanal',
   monthly: 'Mensal',
 };
 
-const frequencyIcons: Record<string, React.ReactNode> = {
-  daily: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  ),
-  weekly: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-    </svg>
-  ),
-  monthly: (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-      <line x1="16" y1="2" x2="16" y2="6" />
-      <line x1="8" y1="2" x2="8" y2="6" />
-      <line x1="3" y1="10" x2="21" y2="10" />
-      <line x1="10" y1="14" x2="14" y2="14" />
-      <line x1="12" y1="12" x2="12" y2="16" />
-    </svg>
-  ),
-};
+const weekdays = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', timeZone: 'UTC' });
 
-export default function RotinasPage() {
+function recurrence(routine: Routine) {
+  if (routine.frequency === 'daily') return 'Todos os dias';
+  const anchor = civilDateAnchor(getCivilDate(new Date(routine.createdAt)));
+  return routine.frequency === 'weekly'
+    ? `Toda ${weekdays.format(anchor)}`
+    : `Dia ${anchor.getUTCDate()}, nos meses com esse dia`;
+}
+
+const initialDraft = { title: '', frequency: 'daily' as Routine['frequency'], time: '08:00', duration: '30' };
+
+function RoutineContent() {
+  const search = useSearchParams();
   const [routines, setRoutines] = useState<Routine[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [newRoutine, setNewRoutine] = useState({ title: '', frequency: 'daily', time: '08:00', duration: '60' });
-  const [generatedInfo, setGeneratedInfo] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [attempt, setAttempt] = useState(0);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState(initialDraft);
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [actions, setActions] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [generated, setGenerated] = useState<Record<string, number | undefined>>({});
+  const addButton = useRef<HTMLButtonElement>(null);
+  const editButton = useRef<HTMLButtonElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const activeCount = routines.filter(routine => routine.active).length;
 
-  const fetchRoutines = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiGet<any[]>('/routines');
-      setRoutines(data);
-    } catch {
-      setRoutines([]);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoadState('loading');
+    apiGet<Routine[]>('/routines', { signal: controller.signal })
+      .then(data => {
+        if (controller.signal.aborted) return;
+        setRoutines(data);
+        setLoadState('ready');
+      })
+      .catch(() => { if (!controller.signal.aborted) setLoadState('error'); });
+    return () => controller.abort();
+  }, [attempt]);
+
+  useEffect(() => {
+    if (search.get('new') === 'true') {
+      setDraft(initialDraft);
+      setFormError('');
+      setEditing('');
     }
-  }, []);
+  }, [search]);
 
-  useEffect(() => { fetchRoutines(); }, [fetchRoutines]);
+  useEffect(() => { if (editing !== null) input.current?.focus(); }, [editing]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newRoutine.title.trim()) return;
+  function showForm(routine?: Routine) {
+    setFormError('');
+    setDraft(routine ? {
+      title: routine.title, frequency: routine.frequency, time: routine.time, duration: String(routine.duration),
+    } : initialDraft);
+    setEditing(routine?.id ?? '');
+  }
+
+  function closeForm() {
+    setEditing(null);
+    setFormError('');
+    const trigger = editing ? editButton.current : addButton.current;
+    requestAnimationFrame(() => trigger?.focus());
+  }
+
+  function replaceRoutine(updated: Routine) {
+    setRoutines(current => current.map(routine => routine.id === updated.id ? updated : routine));
+  }
+
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (saving || loadState !== 'ready' || editing === null || !draft.title.trim()) return;
+    const duration = Number(draft.duration);
+    if (!Number.isInteger(duration) || duration < 1 || duration > 1440) {
+      setFormError('Informe uma duração inteira entre 1 e 1440 minutos.');
+      return;
+    }
+    setSaving(true);
+    setFormError('');
+    const body = { ...draft, title: draft.title.trim(), duration };
     try {
-      await apiPost('/routines', {
-        title: newRoutine.title,
-        frequency: newRoutine.frequency,
-        time: newRoutine.time,
-        duration: parseInt(newRoutine.duration) || 60,
-      });
-      setNewRoutine({ title: '', frequency: 'daily', time: '08:00', duration: '60' });
-      setShowCreateForm(false);
-      fetchRoutines();
-    } catch { /* ignore */ }
-  };
+      if (editing) {
+        replaceRoutine(await apiPatch<Routine>(`/routines/${editing}`, body));
+      } else {
+        const created = await apiPost<Routine>('/routines', body);
+        setRoutines(current => [created, ...current]);
+      }
+      closeForm();
+    } catch {
+      setFormError('Não foi possível salvar a rotina. Seu preenchimento foi mantido.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
-  const handleToggle = async (id: string, active: boolean) => {
+  async function runAction(id: string, label: string, action: () => Promise<void>, failure: string) {
+    if (actions[id]) return;
+    setActions(current => ({ ...current, [id]: label }));
+    setErrors(current => ({ ...current, [id]: '' }));
     try {
-      await apiPatch(`/routines/${id}`, { active: !active });
-      fetchRoutines();
-    } catch { /* ignore */ }
-  };
+      await action();
+    } catch {
+      setErrors(current => ({ ...current, [id]: failure }));
+    } finally {
+      setActions(current => ({ ...current, [id]: '' }));
+    }
+  }
 
-  const handleDelete = async (id: string) => {
-    try {
-      await apiDelete(`/routines/${id}`);
-      fetchRoutines();
-    } catch { /* ignore */ }
-  };
-
-  const handleGenerateTasks = async (id: string) => {
-    try {
-      const tasks = await apiPost<any[]>(`/routines/${id}/generate-tasks?days=7`);
-      setGeneratedInfo(`${tasks.length} tarefa(s) gerada(s) para os próximos 7 dias`);
-      setTimeout(() => setGeneratedInfo(null), 4000);
-    } catch { /* ignore */ }
-  };
-
-  const activeRoutines = routines.filter(r => r.active).length;
-  const totalMinutes = routines.filter(r => r.active).reduce((acc, r) => acc + r.duration, 0);
-  const totalHours = Math.floor(totalMinutes / 60);
-  const remainingMinutes = totalMinutes % 60;
+  function renderForm() {
+    return (
+      <form onSubmit={save} className="space-y-4 p-4 sm:p-5">
+        <h2 className="font-orbitron text-base font-semibold">{editing ? 'Editar rotina' : 'Nova rotina'}</h2>
+        {editing && <p className="text-sm text-[var(--color-text-secondary)]">As mudanças valem para as próximas tarefas geradas. As que já estão na agenda mantêm seus dados.</p>}
+        <fieldset disabled={saving} className="min-w-0 space-y-3">
+          <label className="block space-y-1">
+            <span className="text-sm font-semibold">Nome</span>
+            <input ref={input} className="input w-full" required value={draft.title} placeholder="Ex.: Estudar React"
+              onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="min-w-0 space-y-1">
+              <span className="text-sm font-semibold">Frequência</span>
+              <select className="input w-full" value={draft.frequency}
+                onChange={event => setDraft(current => ({ ...current, frequency: event.target.value as Routine['frequency'] }))}>
+                {Object.entries(frequencyLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="min-w-0 space-y-1">
+              <span className="text-sm font-semibold">Horário</span>
+              <input type="time" className="input min-w-0 w-full" required value={draft.time}
+                onChange={event => setDraft(current => ({ ...current, time: event.target.value }))} />
+            </label>
+            <label className="min-w-0 space-y-1">
+              <span className="text-sm font-semibold">Duração em minutos</span>
+              <input type="number" className="input w-full" required min={1} max={1440} step={1} value={draft.duration}
+                onChange={event => setDraft(current => ({ ...current, duration: event.target.value }))} />
+            </label>
+          </div>
+          {!editing && draft.frequency !== 'daily' && (
+            <p className="text-sm text-[var(--color-text-secondary)]">
+              {draft.frequency === 'weekly' ? 'A rotina se repete no dia da semana em que foi criada.' : 'A rotina se repete no dia do mês em que foi criada, nos meses com esse dia.'}
+            </p>
+          )}
+        </fieldset>
+        {formError && <p role="alert" className="text-sm text-[var(--color-text-secondary)]">{formError}</p>}
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" className="btn btn-primary min-h-11" disabled={saving || loadState !== 'ready' || !draft.title.trim()}>
+            {saving ? 'Salvando…' : editing ? 'Salvar alterações' : 'Criar rotina'}
+          </button>
+          <button type="button" className="btn btn-ghost min-h-11" disabled={saving} onClick={closeForm}>Cancelar</button>
+        </div>
+      </form>
+    );
+  }
 
   return (
     <ShellLayout>
-      <div className="max-w-5xl mx-auto animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[var(--color-success-glow)] text-[var(--color-success)]">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="font-orbitron text-2xl font-bold text-[var(--color-text)]">Rotinas</h1>
-              <p className="text-[var(--color-text-dim)] text-sm">{activeRoutines} ativas · {totalMinutes}min/dia</p>
-            </div>
+      <div className="mx-auto max-w-4xl">
+        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--color-surface-2)] pb-6">
+          <div>
+            <h1 className="font-orbitron text-2xl font-bold tracking-tight sm:text-3xl">Rotinas</h1>
+            <p className="mt-2 text-[var(--color-text-secondary)]">Defina o ritmo dos seus hábitos e gere as tarefas dos próximos sete dias, a partir de hoje.</p>
           </div>
-          <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="btn btn-primary"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            {showCreateForm ? 'Cancelar' : 'Nova Rotina'}
+          <button ref={addButton} type="button" className="btn btn-primary min-h-11" onClick={() => showForm()} disabled={saving || loadState !== 'ready'}>
+            <Plus size={18} aria-hidden="true" /> Nova rotina
           </button>
-        </div>
+        </header>
 
-        {/* Stats Overview */}
-        {routines.length > 0 && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="card p-4 text-center">
-              <p className="text-xs text-[var(--color-text-muted)] mb-1">Total</p>
-              <p className="font-orbitron text-2xl font-bold text-[var(--color-text)]">{routines.length}</p>
-            </div>
-            <div className="card p-4 text-center">
-              <p className="text-xs text-[var(--color-text-muted)] mb-1">Ativas</p>
-              <p className="font-orbitron text-2xl font-bold text-[var(--color-success)]">{activeRoutines}</p>
-            </div>
-            <div className="card p-4 text-center">
-              <p className="text-xs text-[var(--color-text-muted)] mb-1">Tempo/Dia</p>
-              <p className="font-orbitron text-2xl font-bold text-[var(--color-primary)]">
-                {totalHours > 0 ? `${totalHours}h` : ''}{remainingMinutes}m
-              </p>
-            </div>
+        {editing === '' && <div className="card mt-5">{renderForm()}</div>}
+        {loadState === 'loading' && <p role="status" className="py-6 text-[var(--color-text-secondary)]">Carregando rotinas…</p>}
+        {loadState === 'error' && (
+          <div className="card mt-5 space-y-3 p-4">
+            <p role="alert">Não foi possível carregar suas rotinas.</p>
+            <button type="button" className="btn btn-secondary min-h-11" onClick={() => setAttempt(value => value + 1)}>Tentar novamente</button>
           </div>
         )}
-
-        {/* Create Form */}
-        {showCreateForm && (
-          <form onSubmit={handleCreate} className="card p-6 mb-6 hud-border animate-slide-in-up">
-            <h3 className="font-orbitron text-sm font-bold text-[var(--color-success)] mb-4 tracking-wider">NOVA ROTINA</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">TÍTULO</label>
-                <input
-                  type="text"
-                  value={newRoutine.title}
-                  onChange={e => setNewRoutine(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Ex: Estudar React"
-                  className="input w-full"
-                  autoFocus
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">FREQUÊNCIA</label>
-                  <select
-                    value={newRoutine.frequency}
-                    onChange={e => setNewRoutine(prev => ({ ...prev, frequency: e.target.value }))}
-                    className="input w-full"
-                  >
-                    <option value="daily">Diária</option>
-                    <option value="weekly">Semanal</option>
-                    <option value="monthly">Mensal</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">HORÁRIO</label>
-                  <input
-                    type="time"
-                    value={newRoutine.time}
-                    onChange={e => setNewRoutine(prev => ({ ...prev, time: e.target.value }))}
-                    className="input w-full"
-                  />
-                </div>
-                <div>
-                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">DURAÇÃO (min)</label>
-                  <input
-                    type="number"
-                    value={newRoutine.duration}
-                    onChange={e => setNewRoutine(prev => ({ ...prev, duration: e.target.value }))}
-                    min="5"
-                    step="5"
-                    className="input w-full"
-                  />
-                </div>
-              </div>
-              <button type="submit" className="btn btn-primary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Criar Rotina
-              </button>
-            </div>
-          </form>
+        {loadState === 'ready' && !routines.length && editing === null && (
+          <section className="card mt-5 p-5">
+            <Repeat size={23} className="mb-2 text-[var(--color-primary)]" aria-hidden="true" />
+            <h2 className="text-lg font-semibold">Que hábito você quer manter?</h2>
+            <p className="mt-1 text-[var(--color-text-secondary)]">Comece com uma rotina curta e um horário que caiba no seu dia.</p>
+          </section>
         )}
-
-        {/* Success Message */}
-        {generatedInfo && (
-          <div className="card p-4 mb-6 border-[var(--color-success)]/50 bg-[rgba(47,198,62,0.05)] animate-slide-in-up">
-            <div className="flex items-center gap-3">
-              <div className="p-1.5 rounded-lg bg-[var(--color-success)]/20 text-[var(--color-success)]">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
-              <p className="text-sm text-[var(--color-success)] font-medium">{generatedInfo}</p>
-            </div>
-          </div>
-        )}
-
-        {/* Content */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="w-12 h-12 rounded-full border-2 border-[var(--color-surface-2)] border-t-[var(--color-success)] animate-spin mb-4" />
-            <p className="text-[var(--color-text-dim)] text-sm">Carregando rotinas...</p>
-          </div>
-        ) : routines.length === 0 ? (
-          <div className="card p-12 text-center hud-border">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-surface-2)] flex items-center justify-center">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5">
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                <polyline points="22 4 12 14.01 9 11.01" />
-              </svg>
-            </div>
-            <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">Nenhuma rotina</p>
-            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em &quot;Nova Rotina&quot; para criar um hábito.</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {routines.map((routine, index) => (
-              <div
-                key={routine.id}
-                className={`
-                  card p-5 group transition-all duration-200
-                  ${routine.active ? '' : 'opacity-60'}
-                  hover:border-[var(--border-strong)]
-                `}
-                style={{ animationDelay: `${index * 50}ms` }}
-              >
-                <div className="flex items-start justify-between gap-4 mb-4">
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
-                    {/* Status indicator */}
-                    <div className={`
-                      w-3 h-3 rounded-full shrink-0 transition-all
-                      ${routine.active
-                        ? 'bg-[var(--color-success)] shadow-[0_0_8px_var(--color-success-glow)]'
-                        : 'bg-[var(--color-surface-3)]'
-                      }
-                    `} />
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-orbitron text-lg font-bold text-[var(--color-text)] truncate">
-                        {routine.title}
-                      </h3>
+        {loadState === 'ready' && routines.length > 0 && (
+          <section className="mt-5">
+            <p className="mb-3 text-sm text-[var(--color-text-secondary)]">{activeCount} {activeCount === 1 ? 'rotina ativa' : 'rotinas ativas'}</p>
+            <ul className="space-y-3">
+              {routines.map(routine => {
+                const busy = Boolean(actions[routine.id]) || saving;
+                const made = generated[routine.id];
+                return (
+                  <li key={routine.id} className="card min-w-0 p-4 sm:p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <h2 className="min-w-0 break-words font-orbitron text-base font-semibold">{routine.title}</h2>
+                      <span className={`badge ${routine.active ? 'badge-success' : 'badge-warning'}`}>{routine.active ? 'Ativa' : 'Pausada'}</span>
                     </div>
-                  </div>
-
-                  {/* Badges */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="badge badge-primary">
-                      {frequencyIcons[routine.frequency]}
-                      {frequencyLabels[routine.frequency]}
-                    </span>
-                    <span className="font-mono text-xs px-2 py-1 rounded-md bg-[var(--color-surface-2)] text-[var(--color-text-dim)]">
-                      {routine.time}
-                    </span>
-                    <span className="font-mono text-xs px-2 py-1 rounded-md bg-[var(--color-surface-2)] text-[var(--color-text-dim)]">
-                      {routine.duration}min
-                    </span>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => handleToggle(routine.id, routine.active)}
-                    className={`
-                      btn text-xs py-1.5 px-3
-                      ${routine.active
-                        ? 'btn-secondary border-[var(--color-success)]/50 text-[var(--color-success)]'
-                        : 'btn-secondary text-[var(--color-text-dim)]'
-                      }
-                    `}
-                  >
-                    {routine.active ? (
-                      <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                          <polyline points="22 4 12 14.01 9 11.01" />
-                        </svg>
-                        ATIVA
-                      </>
-                    ) : (
-                      <>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="10" y1="15" x2="10" y2="9" />
-                          <line x1="14" y1="15" x2="14" y2="9" />
-                        </svg>
-                        PAUSADA
-                      </>
+                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[var(--color-text-secondary)]">
+                      <span className="inline-flex items-center gap-1.5"><Repeat size={15} aria-hidden="true" /> {recurrence(routine)}</span>
+                      <span className="inline-flex items-center gap-1.5"><Clock size={15} aria-hidden="true" /> {routine.time} · {routine.duration} min</span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button type="button" className="btn btn-primary min-h-11" disabled={busy || !routine.active}
+                        onClick={() => void runAction(routine.id, 'Gerando…', async () => {
+                          setGenerated(current => ({ ...current, [routine.id]: undefined }));
+                          const tasks = await apiPost<Task[]>(`/routines/${routine.id}/generate-tasks?days=7`);
+                          setGenerated(current => ({ ...current, [routine.id]: tasks.length }));
+                        }, 'A geração não terminou. Você pode tentar de novo sem duplicar as tarefas.')}>
+                        <CalendarDays size={16} aria-hidden="true" /> {actions[routine.id] === 'Gerando…' ? 'Gerando…' : 'Gerar para 7 dias'}
+                      </button>
+                      <button type="button" className="btn btn-secondary min-h-11" disabled={busy}
+                        onClick={() => void runAction(routine.id, 'Atualizando…', async () => {
+                          replaceRoutine(await apiPatch<Routine>(`/routines/${routine.id}`, { active: !routine.active }));
+                        }, 'Não foi possível alterar a situação da rotina.')}>
+                        {routine.active ? 'Pausar' : 'Retomar'}
+                      </button>
+                      <button ref={editing === routine.id ? editButton : undefined} type="button" className="btn btn-ghost min-h-11" disabled={busy}
+                        onClick={() => showForm(routine)}>
+                        <Pencil size={16} aria-hidden="true" /> Editar
+                      </button>
+                      <button type="button" className="btn btn-ghost min-h-11 hover:text-[var(--color-danger)]" disabled={busy}
+                        onClick={() => {
+                          if (!window.confirm(`Excluir “${routine.title}” e as tarefas vinculadas a ela, incluindo as concluídas?`)) return;
+                          void runAction(routine.id, 'Excluindo…', async () => {
+                            await apiDelete(`/routines/${routine.id}`);
+                            setRoutines(current => current.filter(item => item.id !== routine.id));
+                            if (editing === routine.id) closeForm();
+                            addButton.current?.focus();
+                          }, 'Não foi possível excluir a rotina.');
+                        }}>
+                        <Trash2 size={16} aria-hidden="true" /> Excluir
+                      </button>
+                    </div>
+                    {!routine.active && <p className="mt-2 text-sm text-[var(--color-text-secondary)]">As tarefas já geradas continuam na agenda.</p>}
+                    {errors[routine.id] && <p role="alert" className="mt-2 text-sm">{errors[routine.id]}</p>}
+                    {made !== undefined && (
+                      <div className="mt-3 border-t border-[var(--color-surface-2)] pt-3">
+                        <p role="status" className="text-sm">
+                          {made ? `${made} ${made === 1 ? 'nova tarefa gerada' : 'novas tarefas geradas'}.` : 'Nenhuma nova tarefa prevista neste período.'}
+                        </p>
+                        <Link href="/relatorio/" className="inline-flex min-h-10 items-center text-sm font-semibold underline decoration-[var(--color-primary)] underline-offset-4">Ver revisão semanal</Link>
+                      </div>
                     )}
-                  </button>
-
-                  <button
-                    onClick={() => handleGenerateTasks(routine.id)}
-                    className="btn btn-secondary text-xs py-1.5 px-3"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-                    </svg>
-                    Gerar 7 dias
-                  </button>
-
-                  <button
-                    onClick={() => handleDelete(routine.id)}
-                    className="ml-auto btn btn-ghost text-xs py-1.5 px-3 text-[var(--color-text-muted)] hover:text-[var(--color-danger)]"
-                  >
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <polyline points="3 6 5 6 21 6" />
-                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    </svg>
-                    Excluir
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+                    {editing === routine.id && <div className="mt-4 rounded-lg border border-[var(--color-surface-2)]">{renderForm()}</div>}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
         )}
       </div>
     </ShellLayout>
   );
+}
+
+export default function RotinasPage() {
+  return <Suspense fallback={<p role="status" className="p-6">Carregando rotinas…</p>}><RoutineContent /></Suspense>;
 }
