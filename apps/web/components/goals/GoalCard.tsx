@@ -1,41 +1,38 @@
+import type { Goal, GoalStatus } from '@zenith/shared';
+import type { ReactNode } from 'react';
+import { ChevronDown, Flag, ListChecks, Pencil, Plus, Trash2 } from 'lucide-react';
+import { categoryLabels, priorityLabels } from './GoalForm';
+import { GoalDeadline, MilestoneItem } from './MilestoneItem';
 import { ProgressBar } from './ProgressBar';
-import { MilestoneItem } from './MilestoneItem';
 
-interface Task {
-  id: string;
-  goalId?: string;
-  title: string;
-  completed: boolean;
-  status: string;
-}
+export const statusLabels: Record<GoalStatus, string> = {
+  ACTIVE: 'Ativa',
+  COMPLETED: 'Concluída',
+  PAUSED: 'Pausada',
+  CANCELLED: 'Cancelada',
+};
 
-interface Milestone {
-  id: string;
-  goalId: string;
-  title: string;
-  deadline?: string;
-  completed: boolean;
-}
+const statusClasses: Record<GoalStatus, string> = {
+  ACTIVE: 'badge-primary',
+  COMPLETED: 'badge-success',
+  PAUSED: 'badge-warning',
+  CANCELLED: 'badge-danger',
+};
 
-interface Goal {
-  id: string;
-  title: string;
-  description?: string;
-  category: string;
-  priority: string;
-  status: string;
-  deadline?: string;
-  milestones: Milestone[];
-  tasks: Task[];
-  createdAt: string;
-  updatedAt: string;
+export function calcProgress(goal: Goal): number {
+  const items = [...goal.milestones, ...goal.tasks];
+  return items.length ? Math.round((items.filter(item => item.completed).length / items.length) * 100) : 0;
 }
 
 interface GoalCardProps {
   goal: Goal;
   isExpanded: boolean;
+  busy: boolean;
+  error?: string;
+  editForm?: ReactNode;
+  onEdit: () => void;
   onToggleExpand: () => void;
-  onStatusChange: (status: string) => void;
+  onStatusChange: (status: GoalStatus) => void;
   onDelete: () => void;
   onAddMilestone: (title: string) => void;
   onToggleMilestone: (milestoneId: string) => void;
@@ -49,204 +46,170 @@ interface GoalCardProps {
   onNewTaskChange: (value: string) => void;
 }
 
-const categoryLabels: Record<string, string> = {
-  pessoal: 'Pessoal',
-  trabalho: 'Trabalho',
-  financeiro: 'Financeiro',
-  saude: 'Saúde',
-  estudo: 'Estudo',
-};
-
-const statusLabels: Record<string, string> = {
-  ACTIVE: 'Ativa',
-  COMPLETED: 'Concluída',
-  PAUSED: 'Pausada',
-  CANCELLED: 'Cancelada',
-};
-
-const priorityColors: Record<string, string> = {
-  alta: 'var(--color-primary)',
-  media: 'var(--color-text-dim)',
-  baixa: 'var(--color-surface-2)',
-};
-
-function calcProgress(goal: Goal): number {
-  const items = [...goal.milestones, ...goal.tasks];
-  if (items.length === 0) return 0;
-  const done = items.filter(i => i.completed).length;
-  return Math.round((done / items.length) * 100);
+function AddGoalItem({ kind, title, onChange, onAdd, disabled }: {
+  kind: 'marco' | 'tarefa';
+  title: string;
+  onChange: (title: string) => void;
+  onAdd: (title: string) => void;
+  disabled: boolean;
+}) {
+  return (
+    <form
+      onSubmit={event => { event.preventDefault(); onAdd(title); }}
+      className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2"
+    >
+      <input
+        className="input min-h-11 min-w-0"
+        value={title}
+        onChange={event => onChange(event.target.value)}
+        placeholder={kind === 'marco' ? 'Novo marco' : 'Nova tarefa'}
+        aria-label={`Título do item: ${kind}`}
+        disabled={disabled}
+        required
+      />
+      <button
+        type="submit"
+        className="btn btn-secondary min-h-11 disabled:opacity-60"
+        aria-label={`Adicionar ${kind}`}
+        disabled={disabled || !title.trim()}
+      >
+        <Plus size={16} aria-hidden="true" />
+        <span className="hidden sm:inline">Adicionar</span>
+      </button>
+    </form>
+  );
 }
 
 export function GoalCard({
-  goal, isExpanded, onToggleExpand,
+  goal, isExpanded, busy, error, editForm, onEdit, onToggleExpand,
   onStatusChange, onDelete,
   onAddMilestone, onToggleMilestone, onDeleteMilestone,
   onAddTask, onToggleTask, onDeleteTask,
   newMilestoneValue, onNewMilestoneChange,
   newTaskValue, onNewTaskChange,
 }: GoalCardProps) {
-  const progress = calcProgress(goal);
+  const detailsId = `meta-detalhes-${goal.id}`;
 
   return (
-    <div className="card card-interactive overflow-hidden animate-fade-in">
-      {/* Goal header */}
-      <div
-        className="p-5 cursor-pointer hover:bg-[var(--color-surface-2)] transition-colors"
-        onClick={onToggleExpand}
-      >
-        <div className="flex items-start justify-between gap-4 mb-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span
-                className="inline-block w-2 h-2 rounded-full shrink-0 animate-pulse-glow"
-                style={{ background: priorityColors[goal.priority] || 'var(--color-text-dim)' }}
-              />
-              <h3 className="font-orbitron text-lg font-bold truncate">{goal.title}</h3>
-            </div>
-            {goal.description && <p className="text-sm text-dim truncate">{goal.description}</p>}
+    <article className="card min-w-0 overflow-hidden">
+      <header className="space-y-3 p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 space-y-2">
+            <h2 className="font-orbitron text-base font-semibold leading-snug [overflow-wrap:anywhere] sm:text-lg">
+              {goal.title}
+            </h2>
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-dim">
+              <span className={`badge ${statusClasses[goal.status] ?? ''}`}>{statusLabels[goal.status] ?? goal.status}</span>
+              <span>{categoryLabels[goal.category] ?? goal.category}</span>
+              <span>Prioridade {priorityLabels[goal.priority]?.toLowerCase() ?? goal.priority}</span>
+            </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="badge badge-primary">
-              {categoryLabels[goal.category] || goal.category}
-            </span>
-            <span className={`badge ${
-              goal.status === 'ACTIVE' ? 'badge-primary' :
-              goal.status === 'COMPLETED' ? 'badge-success' :
-              goal.status === 'CANCELLED' ? 'badge-danger' : 'badge-warning'
-            }`}>
-              {statusLabels[goal.status] || goal.status}
-            </span>
-          </div>
+          <button
+            type="button"
+            className="btn btn-ghost min-h-11 shrink-0"
+            aria-expanded={isExpanded}
+            aria-controls={detailsId}
+            aria-label={`${isExpanded ? 'Recolher' : 'Abrir'} detalhes de ${goal.title}`}
+            onClick={onToggleExpand}
+            disabled={busy}
+          >
+            <span className="hidden sm:inline">Detalhes</span>
+            <ChevronDown size={18} className={isExpanded ? 'rotate-180' : ''} aria-hidden="true" />
+          </button>
         </div>
-
-        <ProgressBar progress={progress} />
-
-        <div className="flex items-center gap-4 mt-3 text-xs text-muted font-mono">
-          <span>🎯 {goal.milestones.length} marcos</span>
-          <span>📋 {goal.tasks.length} tarefas</span>
-          {goal.deadline && <span>📅 {new Date(goal.deadline).toLocaleDateString('pt-BR')}</span>}
+        {goal.description && (
+          <p className="whitespace-pre-line text-sm text-dim [overflow-wrap:anywhere]">{goal.description}</p>
+        )}
+        <ProgressBar progress={calcProgress(goal)} label={`Progresso de ${goal.title}`} />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-dim">
+          <span className="inline-flex items-center gap-1.5">
+            <Flag size={14} aria-hidden="true" /> {goal.milestones.length} {goal.milestones.length === 1 ? 'marco' : 'marcos'}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <ListChecks size={14} aria-hidden="true" /> {goal.tasks.length} {goal.tasks.length === 1 ? 'tarefa' : 'tarefas'}
+          </span>
+          {goal.deadline && <GoalDeadline deadline={goal.deadline} />}
         </div>
-      </div>
+      </header>
 
-      {/* Expanded content */}
       {isExpanded && (
-        <div className="border-t border-[var(--color-surface-2)] p-5 space-y-4 bg-[var(--color-bg)]">
-          {/* Status controls */}
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-dim">STATUS:</span>
-            {['ACTIVE', 'COMPLETED', 'PAUSED', 'CANCELLED'].map(s => (
-              <button
-                key={s}
-                onClick={() => onStatusChange(s)}
-                className={`btn btn-ghost font-mono text-xs ${
-                  goal.status === s
-                    ? 'text-primary border border-[var(--color-primary)]'
-                    : ''
-                }`}
-              >
-                {statusLabels[s]}
-              </button>
-            ))}
-            <button
-              onClick={onDelete}
-              className="ml-auto btn btn-ghost font-mono text-xs text-danger hover:border-[var(--color-danger)]"
-            >
-              🗑️ Excluir
-            </button>
-          </div>
-
-          {/* Milestones */}
-          <div>
-            <p className="font-mono text-xs text-dim mb-2">MARCOS</p>
-            {goal.milestones.length === 0 ? (
-              <p className="text-sm text-dim mb-2">Nenhum marco ainda.</p>
-            ) : (
-              <div className="space-y-1 mb-2">
-                {goal.milestones.map(ms => (
-                  <MilestoneItem
-                    key={ms.id}
-                    title={ms.title}
-                    deadline={ms.deadline}
-                    completed={ms.completed}
-                    onToggle={() => onToggleMilestone(ms.id)}
-                    onDelete={() => onDeleteMilestone(ms.id)}
-                  />
-                ))}
+        <div id={detailsId} className="border-t border-[var(--border-default)]">
+          {editForm ?? (
+            <div className="space-y-5 p-4 sm:p-5">
+              {error && <p className="rounded-md border border-[var(--border-default)] px-3 py-2 text-sm" role="alert">{error}</p>}
+              <div className="flex flex-wrap items-end gap-2">
+                <label className="block space-y-1">
+                  <span className="text-sm font-semibold">Situação</span>
+                  <select
+                    value={goal.status}
+                    onChange={event => onStatusChange(event.target.value as GoalStatus)}
+                    className="input min-h-11"
+                    disabled={busy}
+                  >
+                    {Object.entries(statusLabels).map(([status, label]) => <option key={status} value={status}>{label}</option>)}
+                  </select>
+                </label>
+                <button type="button" className="btn btn-secondary min-h-11" onClick={onEdit} disabled={busy}>
+                  <Pencil size={16} aria-hidden="true" /> Editar
+                </button>
+                <button
+                  type="button"
+                  onClick={onDelete}
+                  className="btn btn-ghost min-h-11 hover:text-[var(--color-danger)] sm:ml-auto"
+                  disabled={busy}
+                >
+                  <Trash2 size={16} aria-hidden="true" /> Excluir meta
+                </button>
               </div>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newMilestoneValue}
-                onChange={e => onNewMilestoneChange(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onAddMilestone(newMilestoneValue); } }}
-                placeholder="Novo marco..."
-                className="flex-1 bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded px-3 py-1.5 text-sm text-white placeholder:text-dim focus:outline-none focus:border-[var(--color-primary)]"
-              />
-              <button
-                onClick={() => onAddMilestone(newMilestoneValue)}
-                className="font-mono text-xs px-3 py-1.5 rounded border border-[var(--color-surface-2)] text-dim hover:text-primary hover:border-[var(--color-primary)] transition-colors"
-              >
-                + Marco
-              </button>
+              <section className="grid items-start gap-5 border-t border-[var(--border-subtle)] pt-4 md:grid-cols-2">
+                <div className="min-w-0">
+                  <h3 className="flex items-center gap-2 text-base font-semibold">
+                    <Flag size={16} aria-hidden="true" /> Marcos
+                  </h3>
+                  {goal.milestones.length > 0 ? (
+                    <ul>
+                      {goal.milestones.map(milestone => (
+                        <MilestoneItem
+                          key={milestone.id}
+                          title={milestone.title}
+                          deadline={milestone.deadline}
+                          completed={milestone.completed}
+                          disabled={busy}
+                          kind="marco"
+                          onToggle={() => onToggleMilestone(milestone.id)}
+                          onDelete={() => onDeleteMilestone(milestone.id)}
+                        />
+                      ))}
+                    </ul>
+                  ) : <p className="mt-1 text-sm text-dim">Nenhum marco cadastrado.</p>}
+                  <AddGoalItem kind="marco" title={newMilestoneValue} onChange={onNewMilestoneChange} onAdd={onAddMilestone} disabled={busy} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="flex items-center gap-2 text-base font-semibold">
+                    <ListChecks size={16} aria-hidden="true" /> Tarefas
+                  </h3>
+                  {goal.tasks.length > 0 ? (
+                    <ul>
+                      {goal.tasks.map(task => (
+                        <MilestoneItem
+                          key={task.id}
+                          title={task.title}
+                          completed={task.completed}
+                          disabled={busy}
+                          kind="tarefa"
+                          onToggle={() => onToggleTask(task.id)}
+                          onDelete={() => onDeleteTask(task.id)}
+                        />
+                      ))}
+                    </ul>
+                  ) : <p className="mt-1 text-sm text-dim">Nenhuma tarefa vinculada.</p>}
+                  <AddGoalItem kind="tarefa" title={newTaskValue} onChange={onNewTaskChange} onAdd={onAddTask} disabled={busy} />
+                </div>
+              </section>
             </div>
-          </div>
-
-          {/* Tasks */}
-          <div>
-            <p className="font-mono text-xs text-dim mb-2">TAREFAS</p>
-            {goal.tasks.length === 0 ? (
-              <p className="text-sm text-dim mb-2">Nenhuma tarefa vinculada.</p>
-            ) : (
-              <div className="space-y-1 mb-2">
-                {goal.tasks.map(task => (
-                  <div key={task.id} className="flex items-center gap-2 group">
-                    <button
-                      onClick={() => onToggleTask(task.id)}
-                      className={`w-4 h-4 rounded border shrink-0 transition-colors ${
-                        task.completed
-                          ? 'bg-primary border-primary'
-                          : 'border-[var(--color-surface-2)] hover:border-[var(--color-primary)]'
-                      }`}
-                    >
-                      {task.completed && (
-                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" className="mx-auto">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </button>
-                    <span className={`text-sm flex-1 ${task.completed ? 'line-through text-dim' : 'text-white'}`}>
-                      {task.title}
-                    </span>
-                    <button
-                      onClick={() => onDeleteTask(task.id)}
-                      className="text-dim hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity text-xs"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newTaskValue}
-                onChange={e => onNewTaskChange(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); onAddTask(newTaskValue); } }}
-                placeholder="Nova tarefa..."
-                className="flex-1 bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded px-3 py-1.5 text-sm text-white placeholder:text-dim focus:outline-none focus:border-[var(--color-primary)]"
-              />
-              <button
-                onClick={() => onAddTask(newTaskValue)}
-                className="font-mono text-xs px-3 py-1.5 rounded border border-[var(--color-surface-2)] text-dim hover:text-primary hover:border-[var(--color-primary)] transition-colors"
-              >
-                + Tarefa
-              </button>
-            </div>
-          </div>
+          )}
         </div>
       )}
-    </div>
+    </article>
   );
 }

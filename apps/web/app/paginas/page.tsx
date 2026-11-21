@@ -1,6 +1,7 @@
 'use client';
 
 // Necessário para export estático — useSearchParams precisa de Suspense boundary
+import { FileText } from 'lucide-react';
 import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -148,7 +149,7 @@ function PageRow({ page, allPages, depth }: { page: PageItem; allPages: PageItem
         ) : (
           <span className="w-5" />
         )}
-        <span className="text-base">{page.icon || '📄'}</span>
+        <span className="text-base">{page.icon || (<FileText aria-hidden="true" className="h-4 w-4 text-[var(--color-primary)]" />)}</span>
         <Link
           href={`/paginas/${page.id}`}
           className="text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors flex-1 font-medium"

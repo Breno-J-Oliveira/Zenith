@@ -1,5 +1,6 @@
 'use client';
 
+import { Bell, Calendar, CalendarDays, Circle, Database, DatabaseZap, FilePlus2, FileText, LayoutDashboard, ListTodo, MessageCircle, Maximize, Plus, RefreshCw, Repeat2, Search, Settings, Target, Zap, type LucideIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -7,7 +8,8 @@ interface Command {
   id: string;
   label: string;
   description?: string;
-  icon: string;
+  icon: LucideIcon;
+  iconColor?: string;
   action: () => void;
   category: string;
   shortcut?: string;
@@ -21,35 +23,35 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
   const commands: Command[] = [
     // Navegação
-    { id: 'nav-dashboard', label: 'Ir para Dashboard', icon: '📊', action: () => router.push('/dashboard'), category: 'Navegação', shortcut: '⌘1' },
-    { id: 'nav-hoje', label: 'Ir para Hoje', icon: '📅', action: () => router.push('/hoje'), category: 'Navegação', shortcut: '⌘2' },
-    { id: 'nav-metas', label: 'Ir para Metas', icon: '🎯', action: () => router.push('/metas'), category: 'Navegação', shortcut: '⌘3' },
-    { id: 'nav-rotinas', label: 'Ir para Rotinas', icon: '🔄', action: () => router.push('/rotinas'), category: 'Navegação', shortcut: '⌘4' },
-    { id: 'nav-calendario', label: 'Ir para Calendário', icon: '📆', action: () => router.push('/calendario'), category: 'Navegação', shortcut: '⌘5' },
-    { id: 'nav-paginas', label: 'Ir para Páginas', icon: '📄', action: () => router.push('/paginas'), category: 'Navegação', shortcut: '⌘6' },
-    { id: 'nav-databases', label: 'Ir para Databases', icon: '🗄️', action: () => router.push('/databases'), category: 'Navegação', shortcut: '⌘7' },
-    { id: 'nav-settings', label: 'Ir para Configurações', icon: '⚙️', action: () => router.push('/settings'), category: 'Navegação', shortcut: '⌘,' },
+    { id: 'nav-dashboard', label: 'Ir para Dashboard', icon: LayoutDashboard, action: () => router.push('/dashboard'), category: 'Navegação', shortcut: '⌘1' },
+    { id: 'nav-hoje', label: 'Ir para Hoje', icon: CalendarDays, action: () => router.push('/hoje'), category: 'Navegação', shortcut: '⌘2' },
+    { id: 'nav-metas', label: 'Ir para Metas', icon: Target, action: () => router.push('/metas'), category: 'Navegação', shortcut: '⌘3' },
+    { id: 'nav-rotinas', label: 'Ir para Rotinas', icon: Repeat2, action: () => router.push('/rotinas'), category: 'Navegação', shortcut: '⌘4' },
+    { id: 'nav-calendario', label: 'Ir para Calendário', icon: Calendar, action: () => router.push('/calendario'), category: 'Navegação', shortcut: '⌘5' },
+    { id: 'nav-paginas', label: 'Ir para Páginas', icon: FileText, action: () => router.push('/paginas'), category: 'Navegação', shortcut: '⌘6' },
+    { id: 'nav-databases', label: 'Ir para Databases', icon: Database, action: () => router.push('/databases'), category: 'Navegação', shortcut: '⌘7' },
+    { id: 'nav-settings', label: 'Ir para Configurações', icon: Settings, action: () => router.push('/settings'), category: 'Navegação', shortcut: '⌘,' },
     
     // Ações Rápidas
-    { id: 'action-new-goal', label: 'Criar Nova Meta', description: 'Definir novo objetivo', icon: '➕', action: () => router.push('/metas?new=true'), category: 'Ações' },
-    { id: 'action-new-task', label: 'Criar Nova Tarefa', description: 'Adicionar tarefa pendente', icon: '✅', action: () => router.push('/hoje?new=true'), category: 'Ações' },
-    { id: 'action-new-routine', label: 'Criar Nova Rotina', description: 'Configurar hábito', icon: '🔄', action: () => router.push('/rotinas?new=true'), category: 'Ações' },
-    { id: 'action-new-page', label: 'Criar Nova Página', description: 'Escrever notas', icon: '📝', action: () => router.push('/paginas?new=true'), category: 'Ações' },
-    { id: 'action-new-database', label: 'Criar Novo Database', description: 'Base de dados flexível', icon: '🗃️', action: () => router.push('/databases?new=true'), category: 'Ações' },
-    { id: 'action-open-chat', label: 'Abrir Chat com IA', description: 'Conversar com assistente', icon: '💬', action: () => document.querySelector<HTMLButtonElement>('button[title="Abrir chat com IA"]')?.click(), category: 'Ações' },
-    { id: 'action-open-search', label: 'Abrir Busca Global', description: 'Buscar em todo o app', icon: '🔍', action: () => document.querySelector<HTMLButtonElement>('button[title="Buscar (Ctrl+K)"]')?.click(), category: 'Ações' },
-    { id: 'action-open-notifications', label: 'Abrir Notificações', description: 'Ver central de notificações', icon: '🔔', action: () => document.querySelector<HTMLButtonElement>('button[title="Notificações"]')?.click(), category: 'Ações' },
-    { id: 'action-new-appointment', label: 'Marcar Compromisso', description: 'Agendar evento com IA', icon: '📅', action: () => router.push('/calendario'), category: 'Ações' },
+    { id: 'action-new-goal', label: 'Criar Nova Meta', description: 'Definir novo objetivo', icon: Plus, action: () => router.push('/metas?new=true'), category: 'Ações' },
+    { id: 'action-new-task', label: 'Criar Nova Tarefa', description: 'Adicionar tarefa pendente', icon: ListTodo, action: () => router.push('/hoje?new=true'), category: 'Ações' },
+    { id: 'action-new-routine', label: 'Criar Nova Rotina', description: 'Configurar hábito', icon: Repeat2, action: () => router.push('/rotinas?new=true'), category: 'Ações' },
+    { id: 'action-new-page', label: 'Criar Nova Página', description: 'Escrever notas', icon: FilePlus2, action: () => router.push('/paginas?new=true'), category: 'Ações' },
+    { id: 'action-new-database', label: 'Criar Novo Database', description: 'Base de dados flexível', icon: DatabaseZap, action: () => router.push('/databases?new=true'), category: 'Ações' },
+    { id: 'action-open-chat', label: 'Abrir Chat com IA', description: 'Conversar com assistente', icon: MessageCircle, action: () => document.querySelector<HTMLButtonElement>('button[title="Abrir chat com IA"]')?.click(), category: 'Ações' },
+    { id: 'action-open-search', label: 'Abrir Busca Global', description: 'Buscar em todo o app', icon: Search, action: () => document.querySelector<HTMLButtonElement>('button[title="Buscar (Ctrl+K)"]')?.click(), category: 'Ações' },
+    { id: 'action-open-notifications', label: 'Abrir Notificações', description: 'Ver central de notificações', icon: Bell, action: () => document.querySelector<HTMLButtonElement>('button[title="Notificações"]')?.click(), category: 'Ações' },
+    { id: 'action-new-appointment', label: 'Marcar Compromisso', description: 'Agendar evento com IA', icon: CalendarDays, action: () => router.push('/calendario'), category: 'Ações' },
 
     
     // Temas
-    { id: 'theme-red', label: 'Tema Vermelho', description: 'Energia e paixão', icon: '🔴', action: () => document.documentElement.setAttribute('data-theme', 'red'), category: 'Temas' },
-    { id: 'theme-violet', label: 'Tema Violeta', description: 'Criatividade e foco', icon: '🟣', action: () => document.documentElement.setAttribute('data-theme', 'violet'), category: 'Temas' },
-    { id: 'theme-green', label: 'Tema Verde', description: 'Crescimento e equilíbrio', icon: '🟢', action: () => document.documentElement.setAttribute('data-theme', 'green'), category: 'Temas' },
+    { id: 'theme-red', label: 'Tema Vermelho', description: 'Energia e paixão', icon: Circle, iconColor: 'text-rose-400', action: () => document.documentElement.setAttribute('data-theme', 'red'), category: 'Temas' },
+    { id: 'theme-violet', label: 'Tema Violeta', description: 'Criatividade e foco', icon: Circle, iconColor: 'text-violet-400', action: () => document.documentElement.setAttribute('data-theme', 'violet'), category: 'Temas' },
+    { id: 'theme-green', label: 'Tema Verde', description: 'Crescimento e equilíbrio', icon: Circle, iconColor: 'text-emerald-400', action: () => document.documentElement.setAttribute('data-theme', 'green'), category: 'Temas' },
     
     // Visualização
-    { id: 'view-fullscreen', label: 'Tela Cheia', description: 'Modo imersivo', icon: '⛶', action: () => document.documentElement.requestFullscreen?.(), category: 'Visualização' },
-    { id: 'view-refresh', label: 'Recarregar Página', description: 'Atualizar dados', icon: '🔄', action: () => window.location.reload(), category: 'Visualização' },
+    { id: 'view-fullscreen', label: 'Tela Cheia', description: 'Modo imersivo', icon: Maximize, action: () => document.documentElement.requestFullscreen?.(), category: 'Visualização' },
+    { id: 'view-refresh', label: 'Recarregar Página', description: 'Atualizar dados', icon: RefreshCw, action: () => window.location.reload(), category: 'Visualização' },
   ];
 
   const filteredCommands = commands.filter(cmd => 
@@ -102,7 +104,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
         {/* Input */}
         <div className="flex items-center gap-3 p-4 border-b border-[var(--color-surface-2)]">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-alt)] text-white flex items-center justify-center shadow-glow">
-            <span className="text-xl">⚡</span>
+            <Zap aria-hidden="true" className="h-5 w-5 text-[var(--color-primary)]" />
           </div>
           <input
             ref={inputRef}
@@ -123,7 +125,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
           {filteredCommands.length === 0 ? (
             <div className="p-8 text-center">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-surface-2)] flex items-center justify-center">
-                <span className="text-2xl">🔍</span>
+                <Search aria-hidden="true" className="h-6 w-6 text-[var(--color-text-dim)]" />
               </div>
               <p className="text-sm text-[var(--color-text-dim)] mb-1">
                 Nenhum comando encontrado
@@ -155,7 +157,7 @@ export function CommandPalette({ isOpen, onClose }: { isOpen: boolean; onClose: 
                           : 'hover:bg-[var(--color-surface-2)]/50 border border-transparent'
                       }`}
                     >
-                      <span className="text-2xl">{cmd.icon}</span>
+                      <cmd.icon aria-hidden="true" className={`h-5 w-5 shrink-0 ${cmd.iconColor ?? "text-[var(--color-primary)]"}`} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-[var(--color-text)]">
                           {cmd.label}

@@ -1,11 +1,13 @@
 'use client';
 
 // Necessário para export estático — useSearchParams precisa de Suspense boundary
+import { Eye, EyeOff } from 'lucide-react';
 import { Suspense } from 'react';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../components/auth/AuthProvider';
+import { ZenithMark } from '@/components/layout/ZenithMark';
 
 function loginDestination(next: string | null): string {
   if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) {
@@ -62,7 +64,7 @@ function LoginPageContent() {
       <div className="relative w-full max-w-md">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="text-6xl mb-4">✦</div>
+          <ZenithMark className="mb-4 h-14 w-14 text-[var(--color-primary)]" />
           <h1 className="font-orbitron text-3xl font-bold tracking-wide">
             <span className="text-primary">Z</span>
             <span className="text-[var(--color-text)]">ENITH</span>
@@ -138,9 +140,9 @@ function LoginPageContent() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors"
-                  tabIndex={-1}
+                  aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                 >
-                  {showPassword ? '🙈' : '👁️'}
+                  {showPassword ? <EyeOff aria-hidden="true" className="h-4 w-4 shrink-0" /> : <Eye aria-hidden="true" className="h-4 w-4 shrink-0" />}
                 </button>
               </div>
             </div>

@@ -1,378 +1,189 @@
 'use client';
 
-// Necessário para export estático — useSearchParams precisa de Suspense boundary
-import { Suspense } from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import type { Goal, GoalStatus } from '@zenith/shared';
+import { Plus, Target } from 'lucide-react';
 import { ShellLayout } from '../../components/layout/ShellLayout';
-import { GoalCard } from '../../components/goals/GoalCard';
-import { apiGet, apiPost, apiPatch, apiDelete, apiPut, API } from '@/lib/api';
+import { GoalCard, statusLabels } from '../../components/goals/GoalCard';
+import { GoalForm, categoryLabels, emptyGoalDraft, type GoalDraft } from '../../components/goals/GoalForm';
+import { apiGet, apiPost, apiPatch, apiDelete, apiPut } from '@/lib/api';
 
-interface Milestone {
-  id: string;
-  goalId: string;
-  title: string;
-  deadline?: string;
-  completed: boolean;
-  createdAt: string;
-}
-
-interface Task {
-  id: string;
-  goalId?: string;
-  milestoneId?: string;
-  title: string;
-  description?: string;
-  status: string;
-  date?: string;
-  completed: boolean;
-  createdAt: string;
-}
-
-interface Goal {
-  id: string;
-  title: string;
-  description?: string;
-  category: string;
-  priority: string;
-  status: string;
-  deadline?: string;
-  milestones: Milestone[];
-  tasks: Task[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-const categoryLabels: Record<string, string> = {
-  pessoal: 'Pessoal',
-  trabalho: 'Trabalho',
-  financeiro: 'Financeiro',
-  saude: 'Saúde',
-  estudo: 'Estudo',
-};
-
-const statusLabels: Record<string, string> = {
-  ACTIVE: 'Ativa',
-  COMPLETED: 'Concluída',
-  PAUSED: 'Pausada',
-  CANCELLED: 'Cancelada',
-};
-
-function calcProgress(goal: Goal): number {
-  const items = [...goal.milestones, ...goal.tasks];
-  if (items.length === 0) return 0;
-  const done = items.filter(i => i.completed).length;
-  return Math.round((done / items.length) * 100);
-}
-
-function MetasPageContent() {
+function GoalsPageContent() {
   const searchParams = useSearchParams();
-
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterStatus, setFilterStatus] = useState<string>('');
-  const [filterCategory, setFilterCategory] = useState<string>('');
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
-  const [newGoal, setNewGoal] = useState({ title: '', description: '', category: 'pessoal', priority: 'media', deadline: '' });
-  const [newMilestone, setNewMilestone] = useState<Record<string, string>>({});
-  const [newTask, setNewTask] = useState<Record<string, string>>({});
+  const [loadError, setLoadError] = useState(false);
+  const [reload, setReload] = useState(0);
+  const [status, setStatus] = useState('');
+  const [category, setCategory] = useState('');
+  const [editing, setEditing] = useState<string | undefined>();
+  const [draft, setDraft] = useState(emptyGoalDraft);
+  const [formError, setFormError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [busy, setBusy] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [milestones, setMilestones] = useState<Record<string, string>>({});
+  const [tasks, setTasks] = useState<Record<string, string>>({});
+  const addButton = useRef<HTMLButtonElement>(null);
+  const filtersActive = Boolean(status || category);
 
-  // Suporta ?new=true vindo do Command Palette
   useEffect(() => {
-    if (searchParams.get('new') === 'true') {
-      setShowCreateForm(true);
-    }
+    if (searchParams.get('new') === 'true') setEditing('');
   }, [searchParams]);
 
-  const fetchGoals = useCallback(async () => {
+  useEffect(() => {
+    const controller = new AbortController();
     setLoading(true);
+    setLoadError(false);
+    const params = { ...(status && { status }), ...(category && { category }) };
+    apiGet<Goal[]>('/goals', { params, signal: controller.signal })
+      .then(data => { if (!controller.signal.aborted) setGoals(data); })
+      .catch(() => { if (!controller.signal.aborted) setLoadError(true); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => controller.abort();
+  }, [status, category, reload]);
+
+  const refresh = () => setReload(attempt => attempt + 1);
+
+  function startForm(goal?: Goal) {
+    setDraft(goal ? {
+      title: goal.title, description: goal.description ?? '', category: goal.category,
+      priority: goal.priority, deadline: goal.deadline?.slice(0, 10) ?? '',
+    } : emptyGoalDraft);
+    setFormError('');
+    setEditing(goal?.id ?? '');
+    if (goal) setExpanded(goal.id);
+  }
+
+  function closeForm() {
+    const create = editing === '';
+    setEditing(undefined);
+    setFormError('');
+    if (create) addButton.current?.focus();
+  }
+
+  async function save() {
+    if (saving || editing === undefined || !draft.title.trim()) return;
+    setSaving(true);
+    setFormError('');
     try {
-      const params: Record<string, string> = {};
-      if (filterStatus) params.status = filterStatus;
-      if (filterCategory) params.category = filterCategory;
-      const data = await apiGet<Goal[]>('/goals', { params });
-      setGoals(data);
+      const fields = { ...draft, title: draft.title.trim(), description: draft.description.trim() };
+      if (editing) {
+        await apiPut(`/goals/${editing}`, { ...fields, deadline: draft.deadline || null });
+      } else {
+        await apiPost('/goals', { ...fields, deadline: draft.deadline || undefined });
+      }
+      closeForm();
+      refresh();
     } catch {
-      setGoals([]);
+      setFormError('Não foi possível salvar a meta. Seus dados foram mantidos.');
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
-  }, [filterStatus, filterCategory]);
+  }
 
-  useEffect(() => { fetchGoals(); }, [fetchGoals]);
-
-  const handleCreateGoal = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newGoal.title.trim()) return;
+  async function change(goalId: string, action: () => Promise<unknown>, message: string) {
+    if (busy[goalId]) return;
+    setBusy(prev => ({ ...prev, [goalId]: true }));
+    setErrors(prev => ({ ...prev, [goalId]: '' }));
     try {
-      const body: any = { title: newGoal.title };
-      if (newGoal.description) body.description = newGoal.description;
-      if (newGoal.category) body.category = newGoal.category;
-      if (newGoal.priority) body.priority = newGoal.priority;
-      if (newGoal.deadline) body.deadline = newGoal.deadline;
-      await apiPost('/goals', body);
-      setNewGoal({ title: '', description: '', category: 'pessoal', priority: 'media', deadline: '' });
-      setShowCreateForm(false);
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
+      await action();
+      refresh();
+    } catch {
+      setErrors(prev => ({ ...prev, [goalId]: message }));
+    } finally {
+      setBusy(prev => ({ ...prev, [goalId]: false }));
+    }
+  }
 
-  const handleDeleteGoal = async (id: string) => {
-    try {
-      await apiDelete(`/goals/${id}`);
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
-
-  const handleStatusChange = async (id: string, status: string) => {
-    try {
-      await apiPut(`/goals/${id}`, { status });
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
-
-  const handleAddMilestone = async (goalId: string, title: string) => {
-    if (!title?.trim()) return;
-    try {
-      await apiPost(`/goals/${goalId}/milestones`, { title });
-      setNewMilestone(prev => ({ ...prev, [goalId]: '' }));
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
-
-  const handleToggleMilestone = async (goalId: string, milestoneId: string) => {
-    try {
-      await apiPatch(`/goals/${goalId}/milestones/${milestoneId}/toggle`);
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
-
-  const handleDeleteMilestone = async (goalId: string, milestoneId: string) => {
-    try {
-      await apiDelete(`/goals/${goalId}/milestones/${milestoneId}`);
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
-
-  const handleAddTask = async (goalId: string, title: string) => {
-    if (!title?.trim()) return;
-    try {
-      await apiPost('/tasks', { title, goalId });
-      setNewTask(prev => ({ ...prev, [goalId]: '' }));
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
-
-  const handleToggleTask = async (taskId: string) => {
-    try {
-      await apiPatch(`/tasks/${taskId}/toggle`);
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
-
-  const handleDeleteTask = async (taskId: string) => {
-    try {
-      await apiDelete(`/tasks/${taskId}`);
-      fetchGoals();
-    } catch { /* ignore */ }
-  };
-
-  const activeGoals = goals.filter(g => g.status === 'ACTIVE').length;
-  const completedGoals = goals.filter(g => g.status === 'COMPLETED').length;
-  const avgProgress = goals.length > 0 
-    ? Math.round(goals.reduce((acc, g) => acc + calcProgress(g), 0) / goals.length) 
-    : 0;
-
-  const priorityColors: Record<string, string> = {
-    alta: 'var(--color-danger)',
-    media: 'var(--color-warning)',
-    baixa: 'var(--color-success)',
-  };
+  function renderForm(isEdit: boolean) {
+    return (
+      <GoalForm draft={draft} setDraft={(value: GoalDraft) => setDraft(value)} onSubmit={() => void save()}
+        onCancel={closeForm} saving={saving} editing={isEdit} error={formError} />
+    );
+  }
 
   return (
     <ShellLayout>
-      <div className="max-w-5xl mx-auto animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-[var(--color-primary-subtle)] text-[var(--color-primary)]">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="6" />
-                <circle cx="12" cy="12" r="2" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="font-orbitron text-2xl font-bold text-[var(--color-text)]">Metas</h1>
-              <p className="text-[var(--color-text-dim)] text-sm">{activeGoals} ativas · {completedGoals} concluídas</p>
-            </div>
+      <div className="mx-auto max-w-4xl">
+        <header className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--color-surface-2)] pb-6">
+          <div>
+            <h1 className="font-orbitron text-2xl font-bold tracking-tight sm:text-3xl">Metas</h1>
+            <p className="mt-2 text-[var(--color-text-secondary)]">Organize objetivos em marcos e tarefas que você pode acompanhar.</p>
           </div>
-          <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="btn btn-primary"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            {showCreateForm ? 'Cancelar' : 'Nova Meta'}
+          <button ref={addButton} type="button" className="btn btn-primary min-h-11" onClick={() => startForm()} disabled={saving}>
+            <Plus size={18} aria-hidden="true" /> Nova meta
           </button>
+        </header>
+
+        {editing === '' && <div className="card mt-5">{renderForm(false)}</div>}
+
+        <div className="grid gap-3 py-5 sm:grid-cols-2">
+          <label className="min-w-0 space-y-1">
+            <span className="text-sm font-semibold">Status</span>
+            <select value={status} onChange={event => setStatus(event.target.value)} className="input w-full">
+              <option value="">Todos os status</option>
+              {Object.entries(statusLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+          </label>
+          <label className="min-w-0 space-y-1">
+            <span className="text-sm font-semibold">Categoria</span>
+            <select value={category} onChange={event => setCategory(event.target.value)} className="input w-full">
+              <option value="">Todas as categorias</option>
+              {Object.entries(categoryLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+          </label>
         </div>
 
-        {/* Stats Overview */}
-        {goals.length > 0 && (
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="card p-4 text-center">
-              <p className="text-xs text-[var(--color-text-muted)] mb-1">Total</p>
-              <p className="font-orbitron text-2xl font-bold text-[var(--color-text)]">{goals.length}</p>
-            </div>
-            <div className="card p-4 text-center">
-              <p className="text-xs text-[var(--color-text-muted)] mb-1">Em Progresso</p>
-              <p className="font-orbitron text-2xl font-bold text-[var(--color-primary)]">{activeGoals}</p>
-            </div>
-            <div className="card p-4 text-center">
-              <p className="text-xs text-[var(--color-text-muted)] mb-1">Progresso Médio</p>
-              <p className="font-orbitron text-2xl font-bold text-[var(--color-success)]">{avgProgress}%</p>
-            </div>
+        {loading && <p role="status" className="py-4 text-[var(--color-text-secondary)]">Carregando metas…</p>}
+        {loadError && (
+          <div className="card space-y-3 p-4">
+            <p role="alert">Não foi possível carregar as metas.</p>
+            <button type="button" className="btn btn-secondary min-h-11" onClick={refresh}>Tentar novamente</button>
           </div>
         )}
-
-        {/* Create Form */}
-        {showCreateForm && (
-          <form onSubmit={handleCreateGoal} className="card p-6 mb-6 hud-border animate-slide-in-up">
-            <h3 className="font-orbitron text-sm font-bold text-[var(--color-primary)] mb-4 tracking-wider">NOVA META</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">TÍTULO</label>
-                <input
-                  type="text"
-                  value={newGoal.title}
-                  onChange={e => setNewGoal(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Ex: Entregar TCC"
-                  className="input w-full"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">DESCRIÇÃO (opcional)</label>
-                <input
-                  type="text"
-                  value={newGoal.description}
-                  onChange={e => setNewGoal(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Ex: Escrever e defender o trabalho de conclusão"
-                  className="input w-full"
-                />
-              </div>
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">CATEGORIA</label>
-                  <select
-                    value={newGoal.category}
-                    onChange={e => setNewGoal(prev => ({ ...prev, category: e.target.value }))}
-                    className="input w-full"
-                  >
-                    {Object.entries(categoryLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">PRIORIDADE</label>
-                  <select
-                    value={newGoal.priority}
-                    onChange={e => setNewGoal(prev => ({ ...prev, priority: e.target.value }))}
-                    className="input w-full"
-                  >
-                    <option value="alta">Alta</option>
-                    <option value="media">Média</option>
-                    <option value="baixa">Baixa</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="font-mono text-[10px] text-[var(--color-text-dim)] tracking-wider block mb-2">DEADLINE (opcional)</label>
-                  <input
-                    type="date"
-                    value={newGoal.deadline}
-                    onChange={e => setNewGoal(prev => ({ ...prev, deadline: e.target.value }))}
-                    className="input w-full"
-                  />
-                </div>
-              </div>
-              <button type="submit" className="btn btn-primary">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Criar Meta
+        {!loading && !loadError && goals.length === 0 && (
+          <div className="card p-5 sm:p-7">
+            <Target size={24} className="mb-3 text-[var(--color-primary)]" aria-hidden="true" />
+            <h2 className="text-lg font-semibold">{filtersActive ? 'Nenhuma meta com esses filtros' : 'O que você quer alcançar?'}</h2>
+            {filtersActive ? (
+              <button type="button" className="btn btn-secondary mt-3 min-h-11" onClick={() => { setStatus(''); setCategory(''); }}>
+                Limpar filtros
               </button>
-            </div>
-          </form>
+            ) : <p className="mt-1 text-[var(--color-text-secondary)]">Crie uma meta e defina um primeiro passo.</p>}
+          </div>
         )}
-
-        {/* Filters */}
-        <div className="flex gap-3 mb-6">
-          <select
-            value={filterStatus}
-            onChange={e => setFilterStatus(e.target.value)}
-            className="input text-sm"
-          >
-            <option value="">Todos status</option>
-            <option value="ACTIVE">Ativa</option>
-            <option value="COMPLETED">Concluída</option>
-            <option value="PAUSED">Pausada</option>
-            <option value="CANCELLED">Cancelada</option>
-          </select>
-          <select
-            value={filterCategory}
-            onChange={e => setFilterCategory(e.target.value)}
-            className="input text-sm"
-          >
-            <option value="">Todas categorias</option>
-            {Object.entries(categoryLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-          </select>
-        </div>
-
-        {/* Goals list */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="w-12 h-12 rounded-full border-2 border-[var(--color-surface-2)] border-t-[var(--color-primary)] animate-spin mb-4" />
-            <p className="text-[var(--color-text-dim)] text-sm">Carregando metas...</p>
-          </div>
-        ) : goals.length === 0 ? (
-          <div className="card p-12 text-center hud-border">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-surface-2)] flex items-center justify-center">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.5">
-                <circle cx="12" cy="12" r="10" />
-                <circle cx="12" cy="12" r="6" />
-                <circle cx="12" cy="12" r="2" />
-              </svg>
-            </div>
-            <p className="font-orbitron text-lg text-[var(--color-text)] mb-2">Nenhuma meta</p>
-            <p className="text-[var(--color-text-dim)] text-sm mb-4">Clique em &quot;Nova Meta&quot; para começar.</p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {goals.map(goal => {
-              const isExpanded = expandedGoal === goal.id;
-              return (
-                <GoalCard
-                  key={goal.id}
-                  goal={goal}
-                  isExpanded={isExpanded}
-                  onToggleExpand={() => setExpandedGoal(isExpanded ? null : goal.id)}
-                  onStatusChange={(status) => handleStatusChange(goal.id, status)}
-                  onDelete={() => handleDeleteGoal(goal.id)}
-                  onAddMilestone={(title) => handleAddMilestone(goal.id, title)}
-                  onToggleMilestone={(mid) => handleToggleMilestone(goal.id, mid)}
-                  onDeleteMilestone={(mid) => handleDeleteMilestone(goal.id, mid)}
-                  onAddTask={(title) => handleAddTask(goal.id, title)}
-                  onToggleTask={(tid) => handleToggleTask(tid)}
-                  onDeleteTask={(tid) => handleDeleteTask(tid)}
-                  newMilestoneValue={newMilestone[goal.id] || ''}
-                  onNewMilestoneChange={(v) => setNewMilestone(prev => ({ ...prev, [goal.id]: v }))}
-                  newTaskValue={newTask[goal.id] || ''}
-                  onNewTaskChange={(v) => setNewTask(prev => ({ ...prev, [goal.id]: v }))}
-                />
-              );
-            })}
+        {!loadError && (
+          <div className="space-y-3" aria-busy={loading}>
+            {goals.map(goal => (
+              <GoalCard key={goal.id} goal={goal} isExpanded={expanded === goal.id} busy={Boolean(busy[goal.id]) || saving}
+                error={errors[goal.id]} editForm={editing === goal.id ? renderForm(true) : undefined}
+                onEdit={() => startForm(goal)} onToggleExpand={() => setExpanded(expanded === goal.id ? null : goal.id)}
+                onStatusChange={(next: GoalStatus) => void change(goal.id, () => apiPut(`/goals/${goal.id}`, { status: next }), 'Não foi possível alterar o status.')}
+                onDelete={() => {
+                  if (window.confirm(`Excluir a meta “${goal.title}” e os itens vinculados?`)) {
+                    void change(goal.id, () => apiDelete(`/goals/${goal.id}`), 'Não foi possível excluir a meta.');
+                  }
+                }}
+                newMilestoneValue={milestones[goal.id] ?? ''}
+                onNewMilestoneChange={title => setMilestones(prev => ({ ...prev, [goal.id]: title }))}
+                onAddMilestone={title => void change(goal.id, async () => {
+                  await apiPost(`/goals/${goal.id}/milestones`, { title: title.trim() });
+                  setMilestones(prev => ({ ...prev, [goal.id]: '' }));
+                }, 'Não foi possível adicionar o marco. Seu texto foi mantido.')}
+                onToggleMilestone={id => void change(goal.id, () => apiPatch(`/goals/${goal.id}/milestones/${id}/toggle`), 'Não foi possível atualizar o marco.')}
+                onDeleteMilestone={id => void change(goal.id, () => apiDelete(`/goals/${goal.id}/milestones/${id}`), 'Não foi possível excluir o marco.')}
+                newTaskValue={tasks[goal.id] ?? ''}
+                onNewTaskChange={title => setTasks(prev => ({ ...prev, [goal.id]: title }))}
+                onAddTask={title => void change(goal.id, async () => {
+                  await apiPost('/tasks', { title: title.trim(), goalId: goal.id });
+                  setTasks(prev => ({ ...prev, [goal.id]: '' }));
+                }, 'Não foi possível adicionar a tarefa. Seu texto foi mantido.')}
+                onToggleTask={id => void change(goal.id, () => apiPatch(`/tasks/${id}/toggle`), 'Não foi possível atualizar a tarefa.')}
+                onDeleteTask={id => void change(goal.id, () => apiDelete(`/tasks/${id}`), 'Não foi possível excluir a tarefa.')} />
+            ))}
           </div>
         )}
       </div>
@@ -380,10 +191,6 @@ function MetasPageContent() {
   );
 }
 
-export default function MetasPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]"><p className="text-[var(--color-text-dim)]">Carregando...</p></div>}>
-      <MetasPageContent />
-    </Suspense>
-  );
+export default function GoalsPage() {
+  return <Suspense fallback={<p role="status" className="p-6">Carregando metas…</p>}><GoalsPageContent /></Suspense>;
 }

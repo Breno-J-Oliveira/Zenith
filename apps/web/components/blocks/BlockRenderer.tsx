@@ -1,5 +1,6 @@
 'use client';
 
+import { ListTodo, Target } from 'lucide-react';
 import { useState } from 'react';
 
 interface BlockData {
@@ -140,7 +141,7 @@ function TaskRefBlock({ block, onDelete }: { block: BlockData; onDelete: (id: st
   return (
     <BlockWrapper onDelete={() => onDelete(block.id)}>
       <div className="flex items-center gap-2 py-1 px-2 bg-surface-1 rounded border border-[var(--color-surface-2)]">
-        <span className="text-xs">📋</span>
+        <ListTodo aria-hidden="true" className="h-4 w-4 shrink-0" />
         <span className="font-mono text-sm text-dim">Task: {block.content.taskId || block.content.title || '—'}</span>
       </div>
     </BlockWrapper>
@@ -151,7 +152,7 @@ function GoalRefBlock({ block, onDelete }: { block: BlockData; onDelete: (id: st
   return (
     <BlockWrapper onDelete={() => onDelete(block.id)}>
       <div className="flex items-center gap-2 py-1 px-2 bg-surface-1 rounded border border-[var(--color-surface-2)]">
-        <span className="text-xs">🎯</span>
+        <Target aria-hidden="true" className="h-4 w-4 shrink-0" />
         <span className="font-mono text-sm text-dim">Meta: {block.content.goalId || block.content.title || '—'}</span>
       </div>
     </BlockWrapper>

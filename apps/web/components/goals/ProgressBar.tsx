@@ -1,28 +1,27 @@
 interface ProgressBarProps {
   progress: number;
-  size?: 'sm' | 'md' | 'lg';
-  showLabel?: boolean;
-  animated?: boolean;
+  label: string;
 }
 
-export function ProgressBar({ progress, size = 'sm', showLabel = true, animated = true }: ProgressBarProps) {
-  const heightClass = size === 'lg' ? 'h-3' : size === 'md' ? 'h-2.5' : 'h-2';
-  
+export function ProgressBar({ progress, label }: ProgressBarProps) {
   return (
     <div className="flex items-center gap-3">
-      <div className={`flex-1 ${heightClass} bg-[var(--color-bg)] rounded-full overflow-hidden border border-[var(--border-subtle)]`}>
+      <div
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress}
+        className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-surface-3)]"
+      >
         <div
-          className={`h-full rounded-full bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-primary-light)] ${
-            animated ? 'transition-all duration-500 ease-out' : ''
-          } ${progress > 0 ? 'glow-subtle' : ''}`}
+          className="h-full rounded-full bg-[var(--color-primary)] motion-safe:transition-[width]"
           style={{ width: `${progress}%` }}
         />
       </div>
-      {showLabel && (
-        <span className="font-mono text-xs text-muted shrink-0 min-w-[2.5rem] text-right">
-          {progress}%
-        </span>
-      )}
+      <span className="min-w-[2.75rem] shrink-0 text-right font-mono text-xs text-dim" aria-hidden="true">
+        {progress}%
+      </span>
     </div>
   );
 }

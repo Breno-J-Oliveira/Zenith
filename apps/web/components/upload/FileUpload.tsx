@@ -1,5 +1,6 @@
 'use client';
 
+import { File, FileText, FolderOpen, ImageIcon, Layers, Music2, Paperclip, Ruler, Table2, Video } from 'lucide-react';
 import { useState, useRef } from 'react';
 
 interface FileUploadProps {
@@ -123,14 +124,14 @@ export function FileUpload({
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  const getFileIcon = (type: string): string => {
-    if (type.startsWith('image/')) return '🖼️';
-    if (type.startsWith('video/')) return '🎥';
-    if (type.startsWith('audio/')) return '🎵';
-    if (type.includes('pdf')) return '📄';
-    if (type.includes('word') || type.includes('document')) return '📝';
-    if (type.includes('sheet') || type.includes('excel')) return '📊';
-    return '📎';
+  const getFileIcon = (type: string) => {
+    if (type.startsWith('image/')) return <ImageIcon aria-hidden="true" className="h-7 w-7 shrink-0 text-[var(--color-text-dim)]" />;
+    if (type.startsWith('video/')) return <Video aria-hidden="true" className="h-7 w-7 shrink-0 text-[var(--color-text-dim)]" />;
+    if (type.startsWith('audio/')) return <Music2 aria-hidden="true" className="h-7 w-7 shrink-0 text-[var(--color-text-dim)]" />;
+    if (type.includes('pdf')) return <File aria-hidden="true" className="h-7 w-7 shrink-0 text-[var(--color-text-dim)]" />;
+    if (type.includes('word') || type.includes('document')) return <FileText aria-hidden="true" className="h-7 w-7 shrink-0 text-[var(--color-text-dim)]" />;
+    if (type.includes('sheet') || type.includes('excel')) return <Table2 aria-hidden="true" className="h-7 w-7 shrink-0 text-[var(--color-text-dim)]" />;
+    return <Paperclip aria-hidden="true" className="h-7 w-7 shrink-0 text-[var(--color-text-dim)]" />;
   };
 
   return (
@@ -176,7 +177,7 @@ export function FileUpload({
               />
             ) : (
               <div className="flex items-center gap-3 p-4 rounded-lg bg-[var(--color-surface-2)]/50">
-                <span className="text-3xl">{getFileIcon(previews[0].file.type)}</span>
+                {getFileIcon(previews[0].file.type)}
                 <div className="text-left">
                   <p className="text-sm font-medium text-[var(--color-text)] truncate max-w-[200px]">
                     {previews[0].file.name}
@@ -217,16 +218,16 @@ export function FileUpload({
               </p>
               <div className="flex items-center justify-center gap-3 mt-3 text-[10px] text-[var(--color-text-muted)]">
                 <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--color-surface-2)]/50">
-                  📏 Máx: {maxSize}MB
+                  <Ruler aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" /> Máx: {maxSize}MB
                 </span>
                 {accept && (
                   <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--color-surface-2)]/50">
-                    📁 {accept.replace('/*', '').replace('image', 'Imagens')}
+                    <FolderOpen aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" /> {accept.replace('/*', '').replace('image', 'Imagens')}
                   </span>
                 )}
                 {multiple && (
                   <span className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[var(--color-surface-2)]/50">
-                    📚 Múltiplos
+                    <Layers aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" /> Múltiplos
                   </span>
                 )}
               </div>
@@ -263,7 +264,7 @@ export function FileUpload({
                   />
                 ) : (
                   <div className="w-full h-24 flex items-center justify-center">
-                    <span className="text-3xl">{getFileIcon(item.file.type)}</span>
+                    {getFileIcon(item.file.type)}
                   </div>
                 )}
                 <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

@@ -1,5 +1,6 @@
 'use client';
 
+import { CalendarDays, Database, FileText, ListTodo, Repeat2, Search, Table2, Target, type LucideIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { API, apiGet } from '@/lib/api';
@@ -10,7 +11,6 @@ interface SearchResult {
   title: string;
   subtitle?: string;
   href: string;
-  icon: string;
   meta?: Record<string, any>;
 }
 
@@ -20,6 +20,16 @@ interface SearchResponse {
   byType: Record<string, number>;
   results: SearchResult[];
 }
+
+const TYPE_ICONS: Record<SearchResult['type'], LucideIcon> = {
+  goal: Target,
+  task: ListTodo,
+  routine: Repeat2,
+  page: FileText,
+  database: Database,
+  appointment: CalendarDays,
+  row: Table2,
+};
 
 const TYPE_LABELS: Record<string, string> = {
   goal: 'Metas',
@@ -272,7 +282,7 @@ export function GlobalSearch({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                         onClick={() => handleRecentClick(search)}
                         className="px-3 py-1.5 rounded-lg bg-[var(--color-surface-2)]/50 hover:bg-[var(--color-primary-subtle)] text-sm text-[var(--color-text-dim)] hover:text-[var(--color-primary)] transition-all"
                       >
-                        <span className="mr-1">🔍</span>
+                        <Search aria-hidden="true" className="mr-1 inline h-3.5 w-3.5" />
                         {search}
                       </button>
                     ))}
@@ -286,18 +296,18 @@ export function GlobalSearch({ isOpen, onClose }: { isOpen: boolean; onClose: ()
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {[
-                    { icon: '🎯', label: 'Metas', desc: 'Objetivos e marcos' },
-                    { icon: '✅', label: 'Tarefas', desc: 'Itens pendentes' },
-                    { icon: '🔄', label: 'Rotinas', desc: 'Hábitos diários' },
-                    { icon: '📄', label: 'Páginas', desc: 'Notas e documentos' },
-                    { icon: '🗄️', label: 'Databases', desc: 'Bases de dados' },
-                    { icon: '📅', label: 'Compromissos', desc: 'Eventos e reuniões' },
+                    { icon: Target, label: 'Metas', desc: 'Objetivos e marcos' },
+                    { icon: ListTodo, label: 'Tarefas', desc: 'Itens pendentes' },
+                    { icon: Repeat2, label: 'Rotinas', desc: 'Hábitos diários' },
+                    { icon: FileText, label: 'Páginas', desc: 'Notas e documentos' },
+                    { icon: Database, label: 'Databases', desc: 'Bases de dados' },
+                    { icon: CalendarDays, label: 'Compromissos', desc: 'Eventos e reuniões' },
                   ].map((item) => (
                     <div
                       key={item.label}
                       className="p-3 rounded-lg bg-[var(--color-surface-2)]/30 border border-[var(--border-subtle)]"
                     >
-                      <span className="text-xl">{item.icon}</span>
+                      <item.icon aria-hidden="true" className="h-5 w-5 shrink-0 text-[var(--color-primary)]" />
                       <p className="text-sm font-medium text-[var(--color-text)] mt-1">{item.label}</p>
                       <p className="text-[10px] text-[var(--color-text-muted)]">{item.desc}</p>
                     </div>
@@ -325,36 +335,39 @@ export function GlobalSearch({ isOpen, onClose }: { isOpen: boolean; onClose: ()
               <p className="px-3 py-2 text-xs font-mono text-[var(--color-text-muted)] uppercase tracking-wider">
                 {response?.total} resultado{response?.total !== 1 ? 's' : ''} encontrado{response?.total !== 1 ? 's' : ''}
               </p>
-              {results.map((result, index) => (
-                <button
-                  key={`${result.type}-${result.id}`}
-                  onClick={() => {
-                    saveRecentSearch(query);
-                    router.push(result.href);
-                    onClose();
-                  }}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
-                    index === selectedIndex
-                      ? 'bg-[var(--color-primary-subtle)] border border-[var(--color-primary)]/30'
-                      : 'hover:bg-[var(--color-surface-2)]/50 border border-transparent'
-                  }`}
-                >
-                  <span className="text-2xl">{result.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-[var(--color-text)] truncate">
-                      {highlight(result.title, query)}
-                    </p>
-                    {result.subtitle && (
-                      <p className="text-xs text-[var(--color-text-muted)] truncate">
-                        {highlight(result.subtitle, query)}
+              {results.map((result, index) => {
+                const Icon = TYPE_ICONS[result.type] ?? Search;
+                return (
+                  <button
+                    key={`${result.type}-${result.id}`}
+                    onClick={() => {
+                      saveRecentSearch(query);
+                      router.push(result.href);
+                      onClose();
+                    }}
+                    className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${
+                      index === selectedIndex
+                        ? 'bg-[var(--color-primary-subtle)] border border-[var(--color-primary)]/30'
+                        : 'hover:bg-[var(--color-surface-2)]/50 border border-transparent'
+                    }`}
+                  >
+                    <Icon aria-hidden="true" className="h-5 w-5 shrink-0 text-[var(--color-primary)]" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-[var(--color-text)] truncate">
+                        {highlight(result.title, query)}
                       </p>
-                    )}
-                  </div>
-                  <span className="text-[10px] font-mono text-[var(--color-text-muted)] uppercase px-2 py-1 rounded-lg bg-[var(--color-surface-2)]/50">
-                    {TYPE_LABELS[result.type] || result.type}
-                  </span>
-                </button>
-              ))}
+                      {result.subtitle && (
+                        <p className="text-xs text-[var(--color-text-muted)] truncate">
+                          {highlight(result.subtitle, query)}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-mono text-[var(--color-text-muted)] uppercase px-2 py-1 rounded-lg bg-[var(--color-surface-2)]/50">
+                      {TYPE_LABELS[result.type] || result.type}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

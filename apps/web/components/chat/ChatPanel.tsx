@@ -1,5 +1,6 @@
 'use client';
 
+import { MessageCircle } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { API, apiGet, apiPost, apiDelete } from '@/lib/api';
 
@@ -149,7 +150,7 @@ export function ChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
   if (!isOpen) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-96 h-[550px] bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-slide-in-up">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-3 right-3 z-50 ml-auto h-[550px] max-h-[calc(100dvh-9rem)] max-w-sm md:bottom-4 md:left-auto md:right-4 md:w-96 bg-[var(--color-surface-1)] border border-[var(--color-surface-2)] rounded-xl shadow-2xl flex flex-col overflow-hidden animate-slide-in-up">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-[var(--color-surface-2)] bg-gradient-to-r from-[var(--color-surface-2)]/30 to-transparent">
         <div className="flex items-center gap-2">
@@ -253,7 +254,7 @@ export function ChatPanel({ isOpen, onClose }: { isOpen: boolean; onClose: () =>
             {activeThread.messages.length === 0 && (
               <div className="text-center py-8">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-[var(--color-primary-subtle)] to-transparent flex items-center justify-center">
-                  <span className="text-3xl">👋</span>
+                  <MessageCircle aria-hidden="true" className="h-7 w-7 text-[var(--color-primary)]" />
                 </div>
                 <p className="text-sm text-[var(--color-text)] mb-2">Olá! Como posso ajudar?</p>
                 <p className="text-xs text-[var(--color-text-muted)] mb-4">

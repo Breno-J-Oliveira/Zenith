@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { Settings, LogOut } from 'lucide-react';
+import { ZenithMark } from './ZenithMark';
 import { useAuth } from '../auth/AuthProvider';
 import { GlobalSearch } from '../search/GlobalSearch';
 import { CommandPalette } from '../command/CommandPalette';
@@ -23,7 +25,7 @@ export function Header() {
         setSearchOpen(true);
       }
       // Ctrl/Cmd + Shift + P para command palette
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'p') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'p') {
         e.preventDefault();
         setCommandOpen(true);
       }
@@ -47,18 +49,13 @@ export function Header() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--color-surface-1)]/95 backdrop-blur-md border-b border-[var(--color-surface-2)] flex items-center justify-between px-6 z-50 header-hud">
-        <Link href={isAuthenticated ? '/dashboard' : '/'} className="flex items-center gap-3 group">
-          <div className="relative">
-            <span className="text-3xl text-[var(--color-primary)] transition-all duration-300 group-hover:drop-shadow-[0_0_8px_var(--color-primary)]">✦</span>
-          </div>
-          <span className="font-orbitron text-xl font-bold tracking-wider">
-            <span className="text-[var(--color-primary)]">Z</span>
-            <span className="text-[var(--color-text)]">ENITH</span>
-          </span>
+      <header className="fixed top-0 left-0 right-0 h-16 bg-[var(--color-surface-1)]/95 backdrop-blur-md border-b border-[var(--color-surface-2)] flex items-center justify-between gap-2 px-3 sm:px-6 z-50">
+        <Link href={isAuthenticated ? '/hoje/' : '/'} className="inline-flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <ZenithMark className="h-7 w-7 shrink-0 text-[var(--color-primary)] sm:h-8 sm:w-8" />
+          <span className="font-orbitron text-sm font-bold tracking-wide sm:text-lg">Zenith</span>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-0.5 sm:gap-2">
           {isAuthenticated && (
             <>
               <button
@@ -79,7 +76,7 @@ export function Header() {
               <button
                 onClick={() => setCommandOpen(true)}
                 className="p-2 rounded-lg text-[var(--color-text-dim)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface-2)]/50 transition-all duration-200"
-                title="Command Palette (Ctrl+Shift+P)"
+                title="Comandos (Ctrl+Shift+P)"
               >
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="4 17 10 11 4 5" />
@@ -96,7 +93,7 @@ export function Header() {
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                <div className="absolute top-1 right-1 w-2 h-2 rounded-full bg-[var(--color-primary)]" />
+
               </button>
             </>
           )}
@@ -116,7 +113,7 @@ export function Header() {
           {isAuthenticated && user ? (
             <div className="relative" ref={userMenuRef}>
               <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                aria-label="Menu da conta" aria-expanded={userMenuOpen} onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-[var(--color-surface-2)]/50 transition-colors"
               >
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--color-primary)] to-[var(--color-primary-alt)] flex items-center justify-center text-white text-sm font-bold">
@@ -132,26 +129,23 @@ export function Header() {
                       {user.name || 'Sem nome'}
                     </p>
                     <p className="text-xs text-[var(--color-text-dim)] truncate">{user.email}</p>
-                    <p className="text-[10px] text-[var(--color-text-muted)] font-mono mt-1">
-                      {user.role} • {user.id.substring(0, 8)}
-                    </p>
                   </div>
                   <div className="py-1">
                     <Link
                       href="/settings"
                       onClick={() => setUserMenuOpen(false)}
-                      className="block px-3 py-2 text-sm text-[var(--color-text-dim)] hover:bg-[var(--color-surface-2)]/50 hover:text-[var(--color-text)]"
+                      className="flex items-center gap-2 px-3 py-2 text-sm text-[var(--color-text-dim)] hover:bg-[var(--color-surface-2)]/50 hover:text-[var(--color-text)]"
                     >
-                      ⚙️ Configurações
+                      <Settings size={16} aria-hidden="true" /> Configurações
                     </Link>
                     <button
                       onClick={async () => {
                         setUserMenuOpen(false);
                         await logout();
                       }}
-                      className="block w-full text-left px-3 py-2 text-sm text-[var(--color-danger)] hover:bg-[var(--color-surface-2)]/50"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm text-[var(--color-danger)] hover:bg-[var(--color-surface-2)]/50"
                     >
-                      🚪 Sair
+                      <LogOut size={16} aria-hidden="true" /> Sair
                     </button>
                   </div>
                 </div>

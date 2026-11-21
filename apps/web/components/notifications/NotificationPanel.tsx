@@ -1,5 +1,6 @@
 'use client';
 
+import { Bell, CircleCheck, CircleX, Info, TriangleAlert } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { apiGet, apiPatch, apiDelete } from '@/lib/api';
 
@@ -85,11 +86,11 @@ export function NotificationPanel({ isOpen, onClose }: { isOpen: boolean; onClos
 
   const getTypeIcon = (type: string) => {
     switch (type) {
-      case 'success': return '✅';
-      case 'warning': return '⚠️';
-      case 'error': return '❌';
-      case 'reminder': return '🔔';
-      default: return 'ℹ️';
+      case 'success': return <CircleCheck aria-hidden="true" className="h-5 w-5" />;
+      case 'warning': return <TriangleAlert aria-hidden="true" className="h-5 w-5" />;
+      case 'error': return <CircleX aria-hidden="true" className="h-5 w-5" />;
+      case 'reminder': return <Bell aria-hidden="true" className="h-5 w-5" />;
+      default: return <Info aria-hidden="true" className="h-5 w-5" />;
     }
   };
 

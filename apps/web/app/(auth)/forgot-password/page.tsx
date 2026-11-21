@@ -1,5 +1,6 @@
 'use client';
 
+import { MailCheck } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../../../components/auth/AuthProvider';
@@ -59,7 +60,7 @@ export default function ForgotPasswordPage() {
           {submitted ? (
             <div className="text-center">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-success-glow)] flex items-center justify-center text-3xl">
-                ✉️
+                <MailCheck aria-hidden="true" className="h-7 w-7 text-[var(--color-success)]" />
               </div>
               <h2 className="font-orbitron text-xl font-bold text-[var(--color-text)] mb-2">
                 Email enviado

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { DatabaseIcon } from './DatabaseIcon';
 import { apiPost, apiDelete } from '@/lib/api';
 
 interface Property {
@@ -22,6 +23,7 @@ interface Database {
   id: string;
   title: string;
   icon: string | null;
+  presetType?: string | null;
   properties: Property[];
   rows?: Row[];
 }
@@ -103,7 +105,7 @@ export function DatabaseGallery({ database, onUpdate }: DatabaseGalleryProps) {
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-4xl">
-                    {database.icon || '📄'}
+                    <DatabaseIcon icon={database.icon} presetType={database.presetType} className="h-8 w-8 text-[var(--color-primary)]" />
                   </div>
                 )}
               </div>

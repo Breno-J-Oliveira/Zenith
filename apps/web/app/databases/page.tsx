@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { ShellLayout } from '../../components/layout/ShellLayout';
 import { DatabaseTable } from '../../components/databases/DatabaseTable';
 import { DatabaseGallery } from '../../components/databases/DatabaseGallery';
+import { DatabaseIcon } from '../../components/databases/DatabaseIcon';
 import { CreateDatabaseModal } from '../../components/databases/CreateDatabaseModal';
 import { apiGet, apiPost, apiDelete } from '@/lib/api';
 
@@ -191,7 +192,7 @@ export default function DatabasesPage() {
                   className="card p-5 cursor-pointer hover:border-[var(--color-primary)]/50 transition-all duration-200 group"
                 >
                   <div className="flex items-start justify-between mb-3">
-                    <span className="text-2xl">{db.icon || '📊'}</span>
+                    <DatabaseIcon icon={db.icon} presetType={db.presetType} className="h-6 w-6 shrink-0 text-[var(--color-primary)]" />
                     <span className="badge badge-primary text-[9px]">
                       {db._count.rows} {db._count.rows === 1 ? 'item' : 'itens'}
                     </span>
@@ -225,7 +226,7 @@ export default function DatabasesPage() {
                     <polyline points="15 18 9 12 15 6" />
                   </svg>
                 </button>
-                <span className="text-2xl">{selectedDb.icon || '📊'}</span>
+                <DatabaseIcon icon={selectedDb.icon} presetType={selectedDb.presetType} className="h-6 w-6 shrink-0 text-[var(--color-primary)]" />
                 <div>
                   <h2 className="font-orbitron text-xl font-bold text-[var(--color-text)]">{selectedDb.title}</h2>
                   <p className="text-xs text-[var(--color-text-muted)]">

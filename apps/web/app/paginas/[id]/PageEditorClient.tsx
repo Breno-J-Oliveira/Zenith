@@ -1,5 +1,6 @@
 'use client';
 
+import { AlignLeft, Heading, ImageIcon, ListTodo, Minus, SquareCheck, Target } from 'lucide-react';
 import { useState, useEffect, useCallback } from 'react';
 import { ShellLayout } from '../../../components/layout/ShellLayout';
 import { BlockRenderer } from '../../../components/blocks/BlockRenderer';
@@ -30,13 +31,13 @@ interface PageData {
 }
 
 const BLOCK_TYPES = [
-  { type: 'heading', label: 'Título', icon: 'H' },
-  { type: 'text', label: 'Texto', icon: '¶' },
-  { type: 'todo', label: 'To-do', icon: '☑' },
-  { type: 'task_ref', label: 'Link Task', icon: '📋' },
-  { type: 'goal_ref', label: 'Link Meta', icon: '🎯' },
-  { type: 'image', label: 'Imagem', icon: '🖼' },
-  { type: 'divider', label: 'Divisor', icon: '—' },
+  { type: 'heading', label: 'Título', icon: Heading },
+  { type: 'text', label: 'Texto', icon: AlignLeft },
+  { type: 'todo', label: 'Lista de tarefas', icon: SquareCheck },
+  { type: 'task_ref', label: 'Vincular tarefa', icon: ListTodo },
+  { type: 'goal_ref', label: 'Vincular meta', icon: Target },
+  { type: 'image', label: 'Imagem', icon: ImageIcon },
+  { type: 'divider', label: 'Divisor', icon: Minus },
 ];
 
 export default function PageEditorClient({ id }: { id: string }) {
@@ -185,7 +186,7 @@ export default function PageEditorClient({ id }: { id: string }) {
                   onClick={() => addBlock(bt.type)}
                   className="flex items-center gap-2 w-full px-3 py-2 hover:bg-surface-2 transition-colors font-mono text-xs text-dim text-left"
                 >
-                  <span className="w-4 text-center">{bt.icon}</span>
+                  <bt.icon aria-hidden="true" className="h-4 w-4 shrink-0" />
                   {bt.label}
                 </button>
               ))}

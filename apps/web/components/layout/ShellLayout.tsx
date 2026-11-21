@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { MessageCircle, X } from 'lucide-react';
 import { Header } from './Header';
 import { Sidebar } from './Sidebar';
 import { ChatPanel } from '../chat/ChatPanel';
@@ -10,37 +11,20 @@ export function ShellLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[var(--color-bg)]">
+      <a href="#zenith-main" className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-[var(--color-surface-1)] focus:px-4 focus:py-3">
+        Ir para o conteúdo
+      </a>
       <Header />
       <Sidebar />
-      <main className="pt-16 pl-[72px] min-h-screen">
-        <div className="p-6">
-          {children}
-        </div>
+      <main id="zenith-main" tabIndex={-1}
+        className="min-h-screen px-4 pt-20 pb-[calc(8rem+env(safe-area-inset-bottom))] sm:px-6 md:ml-52 md:px-8 md:pt-24 md:pb-24">
+        {children}
       </main>
-
-      {/* Chat Toggle Button */}
-      <button
-        onClick={() => setChatOpen(!chatOpen)}
-        className={`fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full shadow-lg flex items-center justify-center transition-all duration-300 ${
-          chatOpen
-            ? 'bg-[var(--color-surface-2)] text-[var(--color-text)] rotate-0'
-            : 'bg-[var(--color-primary)] text-white hover:scale-110 glow'
-        }`}
-        title={chatOpen ? 'Fechar chat' : 'Abrir chat com IA'}
-      >
-        {chatOpen ? (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        ) : (
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
-        )}
+      <button type="button" onClick={() => setChatOpen(open => !open)}
+        title={chatOpen ? 'Fechar chat' : 'Abrir chat com IA'} aria-expanded={chatOpen}
+        className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-40 grid h-11 w-11 place-items-center rounded-full border border-[var(--color-surface-4)] bg-[var(--color-surface-1)] text-[var(--color-text)] shadow-md hover:border-[var(--color-primary)] md:bottom-6 md:right-6">
+        {chatOpen ? <X size={19} aria-hidden="true" /> : <MessageCircle size={19} aria-hidden="true" />}
       </button>
-
-      {/* Chat Panel */}
       <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );

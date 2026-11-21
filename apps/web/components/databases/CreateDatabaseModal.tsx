@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { DatabaseIcon } from './DatabaseIcon';
 
 interface CreateDatabaseModalProps {
   onClose: () => void;
@@ -16,25 +17,21 @@ const PRESETS = [
   {
     type: 'finance',
     title: 'Finanças',
-    icon: '💰',
     description: 'Controle de receitas e despesas',
   },
   {
     type: 'shopping',
     title: 'Lista de Compras',
-    icon: '🛒',
     description: 'Itens para comprar no mercado',
   },
   {
     type: 'study',
     title: 'Estudos',
-    icon: '📚',
     description: 'Organize suas matérias e tópicos',
   },
   {
     type: 'habits',
     title: 'Hábitos',
-    icon: '✅',
     description: 'Acompanhe seus hábitos diários',
   },
 ];
@@ -51,7 +48,7 @@ const PROPERTY_TYPES = [
 export function CreateDatabaseModal({ onClose, onCreate }: CreateDatabaseModalProps) {
   const [mode, setMode] = useState<'preset' | 'custom'>('preset');
   const [title, setTitle] = useState('');
-  const [icon, setIcon] = useState('📊');
+  const [icon, setIcon] = useState('');
   const [properties, setProperties] = useState<{ name: string; type: string }[]>([
     { name: 'Nome', type: 'text' },
   ]);
@@ -89,7 +86,7 @@ export function CreateDatabaseModal({ onClose, onCreate }: CreateDatabaseModalPr
 
     onCreate({
       title,
-      icon,
+      icon: icon.trim() || undefined,
       properties: validProperties,
     });
   };
@@ -175,7 +172,7 @@ export function CreateDatabaseModal({ onClose, onCreate }: CreateDatabaseModalPr
                   onClick={() => handlePresetSelect(preset.type)}
                   className="card p-5 text-left hover:border-[var(--color-primary)]/50 transition-all group"
                 >
-                  <div className="text-3xl mb-3">{preset.icon}</div>
+                  <DatabaseIcon presetType={preset.type} className="mb-3 h-7 w-7 text-[var(--color-primary)]" />
                   <h3 className="font-orbitron text-sm font-bold text-[var(--color-text)] mb-1 group-hover:text-[var(--color-primary)] transition-colors">
                     {preset.title}
                   </h3>
@@ -196,6 +193,7 @@ export function CreateDatabaseModal({ onClose, onCreate }: CreateDatabaseModalPr
                   </label>
                   <input
                     type="text"
+                    aria-label="Ícone personalizado (opcional)"
                     value={icon}
                     onChange={(e) => setIcon(e.target.value)}
                     className="input w-full text-center text-2xl"
